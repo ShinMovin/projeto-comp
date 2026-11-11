@@ -10,5 +10,8 @@ void liberaPerguntas(BancoPerguntas *banco)
 
 int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq)
 {
-    nome_arq = fopen()
+    FILE *arq;
+    Pergunta *perguntas_temp;
+    
+
 }
