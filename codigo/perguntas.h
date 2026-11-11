@@ -10,4 +10,15 @@ typedef struct {
     Dificuldade dificuldade;
 } Pergunta;
 
+typedef struct {
+    int quantidade;
+    int capacidade;
+    int *usadas;
+    Pergunta *perguntas;
+} BancoPerguntas;
+
+int carregaPerguntas (BancoPerguntas *banco, const char *nome_arq);
+int sorteaPergunta (BancoPerguntas *banco, Dificuldade dificuldade);
+void liberaPergunta (BancoPerguntas *banco);
+
 #endif 
