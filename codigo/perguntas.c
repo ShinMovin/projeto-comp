@@ -45,7 +45,7 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
         return 0;
     }//if
 
-    char linha[1200];                  //armazena temporariamente uma linha do arquivo CSV
+    char linha[1200];                  //armazena temporariamente uma linha de perguntas.csv
     fgets(linha, sizeof(linha), arq);  //serve para ignorar o cabeçalho de perguntas.csv
 
     while(fgets(linha, sizeof(linha), arq) != NULL){
