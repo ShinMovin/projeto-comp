@@ -1,5 +1,6 @@
 #ifndef PERGUNTAS_H
 #define PERGUNTAS_H
+#include <stdbool.h>
 
 typedef enum {MUITO_FACIL = 1, FACIL, MEDIO, DIFICIL, IMPOSSIVEL} Dificuldade;
 
@@ -13,11 +14,11 @@ typedef struct {
 typedef struct {
     int quantidade;
     int capacidade;
-    int *usadas;
+    bool *usadas;
     Pergunta *perguntas;
 } BancoPerguntas;
 
-
+int inicializaBanco(BancoPerguntas *banco);
 int carregaPerguntas (BancoPerguntas *banco, const char *nome_arq);
 int sorteaPergunta (BancoPerguntas *banco, Dificuldade dificuldade);
 void liberaBancoPergunta (BancoPerguntas *banco);
