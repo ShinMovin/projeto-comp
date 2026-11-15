@@ -17,6 +17,7 @@ typedef struct {
     Pergunta *perguntas;
 } BancoPerguntas;
 
+
 int carregaPerguntas (BancoPerguntas *banco, const char *nome_arq);
 int sorteaPergunta (BancoPerguntas *banco, Dificuldade dificuldade);
 void liberaBancoPergunta (BancoPerguntas *banco);
