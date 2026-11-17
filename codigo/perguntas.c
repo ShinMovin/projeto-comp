@@ -81,13 +81,13 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
 
         }//if
 
-        for(; linha[i] != '\0' && linha[i] != ';' && j < 200 ; i++){
+        for(; linha[i] != '\0' && linha[i] != ',' && j < 200 ; i++){
             pergunta.conteudo_da_pergunta[j] = linha[i];
             j++;
         }
         pergunta.conteudo_da_pergunta[j] = '\0';
 
-        if(j == 0 || linha[i] != ';'){
+        if(j == 0 || linha[i] != ','){
             //verificando se tá tudo errado
             printf("Erro: enunciado vazio, muito longo ou incompleto!\n");
             fclose(arq);
@@ -96,13 +96,13 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
 
         for(int n = 0; n < 4; n++){
             //verificando se tem o separador
-            if(linha[i] != ';'){
+            if(linha[i] != ','){
                 printf("Erro: linha do CSV incompleta!\n");
                 fclose(arq);
                 return 0;
             }//if
 
-            i++;    // pula o ';' anterior
+            i++;    // pula o ',' anterior
             j = 0;  // reinicia a posição do caracter
 
             for(; linha[i] != '\0' && linha[i] != ';' && j < 200; i++){  //já verifica se ultrapassa o tamanho que colocou pras perguntas e alternativas
@@ -113,14 +113,14 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
             pergunta.alternativas[n][j] = '\0';
 
             //verificando se tá tudo errado
-            if(j == 0 || linha[i] != ';'){
+            if(j == 0 || linha[i] != ','){
                 printf("Erro: alternativa vazia, muito longa ou incompleta!\n");
                 fclose(arq);
                 return 0;
             }//if
         }//for
 
-        if(linha[i] != ';'){
+        if(linha[i] != ','){
             printf("Erro: linha do CSV incompleta!\n");
             fclose(arq);
             return 0;
@@ -137,7 +137,7 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
 
         i ++;  //vai pro caracter ';' 
         //verificando se tem separador no lugar certo
-        if(linha[i] != ';'){
+        if(linha[i] != ','){
             printf("Erro: separador ausente!\n");
             fclose(arq);
             return 0;
