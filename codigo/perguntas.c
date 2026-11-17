@@ -151,7 +151,7 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
             return 0;
         }
         
-        pergunta.dificuldade = (Dificuldade)(linha[i] - '0');  //serve pra converter a string "char linha" em um int
+        pergunta.dificuldades = (Dificuldade)(linha[i] - '0');  //serve pra converter a string "char linha" em um int
 
         i++;
         //verificando se tem algo depois da dificuldade
@@ -172,6 +172,46 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
 }//carregaPerguntas
 
 int sorteaPergunta(BancoPerguntas *banco, Dificuldade dificuldades)
+{
+    int disponiveis = 0;
+    int sorteadas;
+
+    //contar quantas perguntas podem ser utilizadas
+    for(int i = 0 ; i < banco->quantidade ; i++)
+    {
+        if(banco->perguntas[i].dificuldades == dificuldades && !banco->usadas[i])
+        {
+            disponiveis++;
+        }
+    }
+
+    //nao possui perguntas disponiveis de determinada dificuldade
+    if(disponiveis == 0)
+    {
+        return -1;
+    }
+
+    //sorteia das disponiveis
+    sorteadas = rand() % disponiveis;
+
+    for(int i = 0 ; i < banco->quantidade ; i++)
+    {
+        if(banco->perguntas[i].dificuldades == dificuldades && !banco->usadas[i])
+        {
+            if(sorteadas == 0)
+            {
+                banco->usadas[i] = true;
+                return i;//devolve indice desejado
+            }
+        }
+        sorteadas--;
+    }
+
+    //retorna erro caso na entre no if correto para retornar o i
+    return -1;
+}
+
+int cadastraPergunta(BancoPerguntas *banco)
 {
     
 }

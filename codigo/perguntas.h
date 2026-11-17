@@ -20,7 +20,7 @@ typedef struct {
 
 int inicializaBanco(BancoPerguntas *banco);//feito
 int carregaPerguntas (BancoPerguntas *banco, const char *nome_arq);//feito
-int sorteaPergunta (BancoPerguntas *banco, Dificuldade dificuldades);
+int sorteaPergunta (BancoPerguntas *banco, Dificuldade dificuldades);//feito
 void liberaBancoPergunta (BancoPerguntas *banco);//feito
 int cadastraPergunta (BancoPerguntas *banco);
 int listaPergunta (BancoPerguntas *banco);

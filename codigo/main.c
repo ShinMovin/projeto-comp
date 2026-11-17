@@ -3,9 +3,12 @@
 #include <stdbool.h> 
 #include "perguntas.h"
 #include "raylib.h"
+#include <time.h>
 
 int main(){
     BancoPerguntas banco;
+
+    srand(time(NULL));//sorteio com resultados diferentes
 
     if(inicializaBanco(&banco) == 0) {
         return 1;
