@@ -170,3 +170,8 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
     fclose(arq);
     return 1; //indica que deu certo   
 }//carregaPerguntas
+
+int sorteaPergunta(BancoPerguntas *banco, Dificuldade dificuldades)
+{
+    
+}

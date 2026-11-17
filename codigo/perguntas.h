@@ -8,7 +8,7 @@ typedef struct {
     char conteudo_da_pergunta[201];
     char alternativas[4][201];
     int alternativa_correta;
-    Dificuldade dificuldade;
+    Dificuldade dificuldades;
 } Pergunta;
 
 typedef struct {
@@ -18,10 +18,10 @@ typedef struct {
     Pergunta *perguntas;
 } BancoPerguntas;
 
-int inicializaBanco(BancoPerguntas *banco);
-int carregaPerguntas (BancoPerguntas *banco, const char *nome_arq);
-int sorteaPergunta (BancoPerguntas *banco, Dificuldade dificuldade);
-void liberaBancoPergunta (BancoPerguntas *banco);
+int inicializaBanco(BancoPerguntas *banco);//feito
+int carregaPerguntas (BancoPerguntas *banco, const char *nome_arq);//feito
+int sorteaPergunta (BancoPerguntas *banco, Dificuldade dificuldades);
+void liberaBancoPergunta (BancoPerguntas *banco);//feito
 int cadastraPergunta (BancoPerguntas *banco);
 int listaPergunta (BancoPerguntas *banco);
 int pesquisaPergunta (BancoPerguntas *banco);
