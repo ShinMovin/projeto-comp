@@ -2,6 +2,7 @@
 #define PERGUNTAS_H
 #include <stdbool.h>
 
+typedef enum {GEEK = 1, ESPORTES, MATEMATICA, GEOGRAFIA, BIOLOGIA} Categoria;
 typedef enum {MUITO_FACIL = 1, FACIL, MEDIO, DIFICIL, IMPOSSIVEL} Dificuldade;
 
 typedef struct {
@@ -9,6 +10,7 @@ typedef struct {
     char alternativas[4][201];
     char alternativa_correta;
     Dificuldade dificuldades;
+    Categoria categorias;
 } Pergunta;
 
 typedef struct {
@@ -20,7 +22,7 @@ typedef struct {
 
 int inicializaBanco(BancoPerguntas *banco);//feito
 int carregaPerguntas (BancoPerguntas *banco, const char *nome_arq);//feito
-int sorteaPergunta (BancoPerguntas *banco, Dificuldade dificuldades);//feito
+int sorteaPergunta (BancoPerguntas *banco, Dificuldade dificuldades, Categoria categorias);//feito
 void liberaBancoPergunta (BancoPerguntas *banco);//feito
 int lerPergunta(Pergunta *perguntas);//feito
 int adicionaPerguntas(BancoPerguntas *banco, Pergunta *perguntas);//feito

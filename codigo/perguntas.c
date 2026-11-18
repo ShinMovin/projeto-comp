@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 
+//cria o banco vazio, alocando os vetores com a capacidade inicial
 int inicializaBanco(BancoPerguntas *banco){
     (*banco).quantidade = 0;
     (*banco).capacidade = 5;
@@ -26,6 +27,7 @@ int inicializaBanco(BancoPerguntas *banco){
     return 1; //indica que deu certo
 }
 
+//libera a memoria do banco
 void liberaBancoPergunta(BancoPerguntas *banco){
     //liberando memória
     free((*banco).perguntas);
@@ -92,6 +94,7 @@ int lerString(const char *texto, int *posicao, char *destino)
     return 1;
 }
 
+//le as perguntas do arquivo csv e coloca no banco
 int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
     FILE *arq;
     
@@ -189,11 +192,27 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
             fclose(arq);
             return 0;
         }
-        
         pergunta.dificuldades = (Dificuldade)(linha[i] - '0');  //converte os caracteres ('1' a '5') no numero da dificuldade
 
+        i ++;  //vai para ',' depois da dificulade 
+        //verificando se tem separador no lugar certo
+        if(linha[i] != ','){
+            printf("Erro: separador ausente!\n");
+            fclose(arq);
+            return 0;
+        }
+
+        i++; //pula o ','
+        //verificando se a categoria foi digitada certa
+        if(linha[i] < '1' || linha[i] > '5'){
+            printf("Erro: categoria invalida!\n");
+            fclose(arq);
+            return 0;
+        }
+        pergunta.categorias = (Categoria)(linha[i] - '0');
+
         i++;
-        //verificando se tem algo depois da dificuldade
+        //verificando se tem algo depois da categoria
         if(linha[i] != '\n' && linha[i] != '\0'){
             printf("Erro: caracteres extras no final da linha!\n");
             fclose(arq);
@@ -210,7 +229,8 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
     return 1; //indica que deu certo   
 }//carregaPerguntas
 
-int sorteaPergunta(BancoPerguntas *banco, Dificuldade dificuldades)
+//sorteia uma pergunta nao usada da dificuldade e categoria pedidas, retorna o indice ou -1
+int sorteaPergunta(BancoPerguntas *banco, Dificuldade dificuldades, Categoria categorias)
 {
     int disponiveis = 0;
     int sorteadas;
@@ -218,13 +238,13 @@ int sorteaPergunta(BancoPerguntas *banco, Dificuldade dificuldades)
     //contar quantas perguntas podem ser utilizadas
     for(int i = 0 ; i < banco->quantidade ; i++)
     {
-        if(banco->perguntas[i].dificuldades == dificuldades && !banco->usadas[i])
+        if(banco->perguntas[i].categorias == categorias && banco->perguntas[i].dificuldades == dificuldades && !banco->usadas[i])
         {
             disponiveis++;
         }
     }
 
-    //nao possui perguntas disponiveis de determinada dificuldade
+    //nao possui perguntas disponiveis de determinada dificuldade e categoria
     if(disponiveis == 0)
     {
         return -1;
@@ -235,7 +255,7 @@ int sorteaPergunta(BancoPerguntas *banco, Dificuldade dificuldades)
 
     for(int i = 0 ; i < banco->quantidade ; i++)
     {
-        if(banco->perguntas[i].dificuldades == dificuldades && !banco->usadas[i])
+        if(banco->perguntas[i].categorias == categorias && banco->perguntas[i].dificuldades == dificuldades && !banco->usadas[i])
         {
             if(sorteadas == 0)
             {
@@ -256,6 +276,7 @@ int lerPergunta(Pergunta *perguntas)
 {
     char texto[300];
     int dificuldade;
+    int categoria;
     
     //ler enunciado 
     do
@@ -341,11 +362,29 @@ int lerPergunta(Pergunta *perguntas)
     } while (dificuldade < 1 || dificuldade > 5);
 
     perguntas->dificuldades = (Dificuldade) dificuldade;
+
+    //le a categoria
+    do
+    {
+        categoria = 0;
+
+        printf("Digite a categoria (1 - Geek, 2 - Esportes, 3 - Matematica, 4 - Geografia, 5 - Biologia): ");
+        scanf(" %d", &categoria);
+
+        if(categoria < 1 || categoria > 5)
+        {
+            printf("Categoria inválida !\n");
+        }
+
+        while(getchar() != '\n');
+    } while (categoria < 1 || categoria > 5);
+
+    perguntas->categorias = (Categoria) categoria;
     
     return 1;
 }
 
-//salva as perguntas no banco de perguntas
+//adiciona uma pergunta no banco, aumentando o vetor se precisar
 int adicionaPerguntas(BancoPerguntas *banco, Pergunta *perguntas)
 {
     //bloco copiado da funcao acima, sem fclose(arq)
@@ -400,18 +439,19 @@ int salvaPergunta(BancoPerguntas *banco, char *nome_arq)
         return 0;
     }
 
-    fprintf(arq, "enunciado,alternativa_A,alternativa_B,alternativa_C,alternativa_D,alternativa_correta,dificuldade\n");
+    fprintf(arq, "enunciado,alternativa_A,alternativa_B,alternativa_C,alternativa_D,alternativa_correta,dificuldade,categoria\n");
 
     for(int i = 0 ; i < banco->quantidade ; i++)
     {
-        fprintf(arq, "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%c,%d\n",
+        fprintf(arq, "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%c,%d,%d\n",
                 banco->perguntas[i].conteudo_da_pergunta,
                 banco->perguntas[i].alternativas[0], 
                 banco->perguntas[i].alternativas[1], 
                 banco->perguntas[i].alternativas[2], 
                 banco->perguntas[i].alternativas[3], 
                 banco->perguntas[i].alternativa_correta, 
-                banco->perguntas[i].dificuldades);
+                banco->perguntas[i].dificuldades,
+                banco->perguntas[i].categorias);
     }
 
     fclose(arq);
@@ -419,6 +459,7 @@ int salvaPergunta(BancoPerguntas *banco, char *nome_arq)
     return 1;
 }
 
+//mostra todas as perguntas do banco
 int listaPergunta (BancoPerguntas *banco)
 {
     if(banco->quantidade == 0)
@@ -438,23 +479,46 @@ int listaPergunta (BancoPerguntas *banco)
         switch (banco->perguntas[i].dificuldades)
         {
         case MUITO_FACIL:
-            printf("Alternativa correta : %c | Dificuldade : Muito fácil\n\n", banco->perguntas[i].alternativa_correta);
+            printf("Alternativa correta : %c | Dificuldade : Muito fácil | ", banco->perguntas[i].alternativa_correta);
             break;
         
         case FACIL:
-            printf("Alternativa correta : %c | Dificuldade : Fácil\n\n", banco->perguntas[i].alternativa_correta);
+            printf("Alternativa correta : %c | Dificuldade : Fácil | ", banco->perguntas[i].alternativa_correta);
             break;
 
         case MEDIO:
-            printf("Alternativa correta : %c | Dificuldade : Médio\n\n", banco->perguntas[i].alternativa_correta);
+            printf("Alternativa correta : %c | Dificuldade : Médio | ", banco->perguntas[i].alternativa_correta);
             break;
 
         case DIFICIL:
-            printf("Alternativa correta : %c | Dificuldade : Difícil\n\n", banco->perguntas[i].alternativa_correta);
+            printf("Alternativa correta : %c | Dificuldade : Difícil | ", banco->perguntas[i].alternativa_correta);
             break;
 
         case IMPOSSIVEL:
-            printf("Alternativa correta : %c | Dificuldade : Impossível\n\n", banco->perguntas[i].alternativa_correta);
+            printf("Alternativa correta : %c | Dificuldade : Impossível | ", banco->perguntas[i].alternativa_correta);
+            break;
+        }
+
+        switch (banco->perguntas[i].categorias)
+        {
+        case GEEK:
+            printf("Categoria : Geek\n\n");
+            break;
+        
+        case ESPORTES:
+            printf("Categoria : Esportes\n\n");
+            break;
+
+        case MATEMATICA:
+            printf("Categoria : Matematica\n\n");
+            break;
+
+        case GEOGRAFIA:
+            printf("Categoria : Geografia\n\n");
+            break;
+
+        case BIOLOGIA:
+            printf("Categoria : Biologia\n\n");
             break;
         }
     }
@@ -462,6 +526,7 @@ int listaPergunta (BancoPerguntas *banco)
     return 1;
 }
 
+//procura perguntas pelo texto do enunciado
 int pesquisaPergunta(BancoPerguntas *banco)
 {
     char texto[201];
@@ -498,26 +563,49 @@ int pesquisaPergunta(BancoPerguntas *banco)
             switch (banco->perguntas[i].dificuldades)
             {
             case MUITO_FACIL:
-                printf("Alternativa correta : %c | Dificuldade : Muito fácil\n\n", banco->perguntas[i].alternativa_correta);
+                printf("Alternativa correta : %c | Dificuldade : Muito fácil | ", banco->perguntas[i].alternativa_correta);
                 break;
             
             case FACIL:
-                printf("Alternativa correta : %c | Dificuldade : Fácil\n\n", banco->perguntas[i].alternativa_correta);
+                printf("Alternativa correta : %c | Dificuldade : Fácil | ", banco->perguntas[i].alternativa_correta);
                 break;
 
             case MEDIO:
-                printf("Alternativa correta : %c | Dificuldade : Médio\n\n", banco->perguntas[i].alternativa_correta);
+                printf("Alternativa correta : %c | Dificuldade : Médio | ", banco->perguntas[i].alternativa_correta);
                 break;
 
             case DIFICIL:
-                printf("Alternativa correta : %c | Dificuldade : Difícil\n\n", banco->perguntas[i].alternativa_correta);
+                printf("Alternativa correta : %c | Dificuldade : Difícil | ", banco->perguntas[i].alternativa_correta);
                 break;
 
             case IMPOSSIVEL:
-                printf("Alternativa correta : %c | Dificuldade : Impossível\n\n", banco->perguntas[i].alternativa_correta);
+                printf("Alternativa correta : %c | Dificuldade : Impossível | ", banco->perguntas[i].alternativa_correta);
                 break;
             }
-        }
+
+            switch (banco->perguntas[i].categorias)
+            {
+            case GEEK:
+                printf("Categoria : Geek\n\n");
+                break;
+            
+            case ESPORTES:
+                printf("Categoria : Esportes\n\n");
+                break;
+
+            case MATEMATICA:
+                printf("Categoria : Matematica\n\n");
+                break;
+
+            case GEOGRAFIA:
+                printf("Categoria : Geografia\n\n");
+                break;
+
+            case BIOLOGIA:
+                printf("Categoria : Biologia\n\n");
+                break;
+            }
+            }
     }
 
     if(encontradas == 0)
