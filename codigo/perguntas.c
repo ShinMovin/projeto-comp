@@ -461,3 +461,8 @@ int listaPergunta (BancoPerguntas *banco)
 
     return 1;
 }
+
+int pesquisePergunta(BancoPerguntas *BancoPerguntas)
+{
+    
+}

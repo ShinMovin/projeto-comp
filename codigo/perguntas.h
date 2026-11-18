@@ -25,7 +25,7 @@ void liberaBancoPergunta (BancoPerguntas *banco);//feito
 int lerPergunta(Pergunta *perguntas);//feito
 int adicionaPerguntas(BancoPerguntas *banco, Pergunta *perguntas);//feito
 int salvaPergunta(BancoPerguntas *banco, char *nome_arq);//feito
-int listaPergunta (BancoPerguntas *banco);
+int listaPergunta (BancoPerguntas *banco);//feito
 int pesquisaPergunta (BancoPerguntas *banco);
 int alteraPergunta (BancoPerguntas *banco);
 int excluiPergunta (BancoPerguntas *banco);
