@@ -22,7 +22,7 @@ int inicializaBanco(BancoPerguntas *banco);//feito
 int carregaPerguntas (BancoPerguntas *banco, const char *nome_arq);//feito
 int sorteaPergunta (BancoPerguntas *banco, Dificuldade dificuldades);//feito
 void liberaBancoPergunta (BancoPerguntas *banco);//feito
-int lerPergunta(Pergunta *perguntas);
+int lerPergunta(Pergunta *perguntas);//feito
 int adicionaPergunta(BancoPerguntas *banco, Pergunta *perguntas);
 int listaPergunta (BancoPerguntas *banco);
 int pesquisaPergunta (BancoPerguntas *banco);

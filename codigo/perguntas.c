@@ -251,7 +251,90 @@ int sorteaPergunta(BancoPerguntas *banco, Dificuldade dificuldades)
     return -1;
 }
 
+//capta as informacoes de uma pergunta
 int lerPergunta(Pergunta *perguntas)
 {
+    char texto[300];
+    int dificuldade;
     
+    //ler enunciado 
+    do
+    {
+        printf("Digite o enunciado da questao\n");
+        fgets(texto, sizeof(texto), stdin);
+        texto[strcspn(texto, "\n")] = '\0';
+
+        if (strlen(texto) > 200)
+        {
+            printf("Pergunta muito grande !\n");
+        }
+        else if(strlen(texto) == 0)
+        {
+            printf("O enunciado nao pode ser vazio !\n");
+        }
+
+    } while (strlen(texto) > 200 || strlen(texto) == 0);
+
+    strcpy(perguntas->conteudo_da_pergunta, texto);//copia a string para o lugar correto
+    
+    //le os enunciados das quatro alternativas
+    for(int i = 0 ; i < 4 ; i++)
+    {
+        do
+        {
+            printf("Digite a alternativa %c : ", 'A'+i);
+            fgets(texto, sizeof(texto), stdin);
+            texto[strcspn(texto, "\n")] = '\0';
+
+            if (strlen(texto) > 200)
+            {
+                printf("Alternativa muito grande !\n");
+            }
+            else if(strlen(texto) == 0)
+            {
+                printf("A alternativa nao pode ser vazia !\n");
+            }
+
+        } while (strlen(texto) > 200 || strlen(texto) == 0);
+
+        strcpy(perguntas->alternativas[i], texto);
+    }
+
+    //le a alternativa certa 
+    do
+    {
+        printf("Digite a alternativa correta (A-D) : ");
+        scanf(" %c", &perguntas->alternativa_correta);
+
+        if(toupper(perguntas->alternativa_correta) < 'A' || toupper(perguntas->alternativa_correta) > 'D')
+        {
+            printf("Alternativa invalida !\n");
+        }
+
+        while(getchar() != '\n');
+    } while (toupper(perguntas->alternativa_correta) < 'A' || toupper(perguntas->alternativa_correta) > 'D');
+
+    perguntas->alternativa_correta = toupper(perguntas->alternativa_correta);
+    
+    //le a dificuldade
+    do
+    {
+        dificuldade = 0;
+
+        printf("Digite a dificuldade (1 - Muito facil, 2 - Facil, 3 - Medio, 4 - Dificil, 5 - Impossivel): ");
+        scanf(" %d", &dificuldade);
+
+        if(dificuldade < 1 || dificuldade > 5)
+        {
+            printf("Dificuldade invalida !\n");
+        }
+
+        while(getchar() != '\n');
+    } while (dificuldade < 1 || dificuldade > 5);
+
+    perguntas->dificuldades = (Dificuldade) dificuldade;
+
+    
+    
+    return 1;
 }
