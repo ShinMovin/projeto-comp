@@ -807,3 +807,89 @@ int alteraPergunta(BancoPerguntas *banco)
     
     return 1;
 }
+
+int salvaBinario(BancoPerguntas *banco, const char *nome_arq)
+{
+    FILE *arq;
+
+    arq = fopen(nome_arq, "wb");
+
+    if(arq == NULL)
+    {
+        printf("Erro na abertura do arquivo %s\n", nome_arq);
+        return 0;
+    }
+
+    fwrite(&banco->quantidade, sizeof(int), 1, arq);
+    fwrite(banco->perguntas, sizeof(Pergunta), banco->quantidade, arq);
+    fclose(arq);
+
+    return 1;
+}
+
+int carregaBinario(BancoPerguntas *banco, const char *nome_arq)
+{
+    FILE *arq;
+
+    arq = fopen(nome_arq, "rb");
+
+    if(arq == NULL)
+    {
+        return 0;
+    }
+
+    int quantidade;
+
+    if(fread(&quantidade, sizeof(int), 1, arq) != 1)
+    {
+        fclose(arq);
+        return 0;
+    }
+
+    if(quantidade > banco->capacidade)
+    {
+        int novaCapacidade = banco->capacidade;
+
+        while(quantidade > novaCapacidade)
+        {
+            novaCapacidade = novaCapacidade * 2;
+        }
+
+        Pergunta *temp = realloc(banco->perguntas, novaCapacidade * sizeof(Pergunta));
+        bool *tempUsadas = realloc(banco->usadas, novaCapacidade * sizeof(bool));
+
+        if(temp != NULL)
+        {
+            banco->perguntas = temp;
+        }
+
+        if(tempUsadas != NULL)
+        {
+            banco->usadas = tempUsadas;
+        }
+
+        if(temp == NULL || tempUsadas == NULL)
+        {
+            fclose(arq);
+            return 0;
+        }
+
+        banco->capacidade = novaCapacidade;
+    }
+
+    if(fread(banco->perguntas, sizeof(Pergunta), quantidade, arq) != (size_t)quantidade)
+    {
+        fclose(arq);
+        return 0;
+    }
+
+    banco->quantidade = quantidade;
+
+    for(int i = 0; i < banco->capacidade ; i++)
+    {
+        banco->usadas[i] = false;
+    }
+
+    fclose(arq);
+    return 1;
+}

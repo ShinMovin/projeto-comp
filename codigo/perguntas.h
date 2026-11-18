@@ -31,5 +31,7 @@ int listaPergunta (BancoPerguntas *banco);
 int pesquisaPergunta (BancoPerguntas *banco);
 int alteraPergunta (BancoPerguntas *banco);
 int excluiPergunta (BancoPerguntas *banco);
+int salvaBinario(BancoPerguntas *banco, const char *nome_arq);
+int carregaBinario(BancoPerguntas *banco, const char *nome_arq);
 
 #endif 

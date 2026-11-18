@@ -16,12 +16,17 @@ int main(){
         return 1;
     }
 
-    //teste pra ver se ta funcionando a função
-    if(carregaPerguntas(&banco, "../dados/perguntas.csv") == 0){
-        liberaBancoPergunta(&banco);
-        return 1;
+    //tenta carregar o binario; se nao existir, carrega o csv.
+    if(carregaBinario(&banco, "../dados/perguntas.bin") == 0)
+    {
+        if(carregaPerguntas(&banco, "../dados/perguntas.csv") == 0)
+        {
+            liberaBancoPergunta(&banco);
+            return 1;
+        }
+        salvaBinario(&banco, "../dados/perguntas.bin");
     }
-
+    
     do
     {
         printf("======= MENU =======\n");
@@ -47,6 +52,7 @@ int main(){
             if(adicionaPerguntas(&banco, &nova) == 1)
             {
                 salvaPergunta(&banco, "../dados/perguntas.csv");
+                salvaBinario(&banco, "../dados/perguntas.bin");
             }
             break;
 
@@ -58,6 +64,7 @@ int main(){
             if(alteraPergunta(&banco) == 1)
             {
                 salvaPergunta(&banco, "../dados/perguntas.csv");
+                salvaBinario(&banco, "../dados/perguntas.bin");
             }
             break;
 
@@ -65,6 +72,7 @@ int main(){
             if(excluiPergunta(&banco) == 1)
             {
                 salvaPergunta(&banco, "../dados/perguntas.csv");
+                salvaBinario(&banco, "../dados/perguntas.bin");
             }
             break;
 
