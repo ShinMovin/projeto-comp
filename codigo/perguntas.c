@@ -674,3 +674,136 @@ int excluiPergunta(BancoPerguntas *banco)
 
     return 1;
 }
+
+int alteraPergunta(BancoPerguntas *banco)
+{
+    int indice = 0, numero_real;
+
+    if(banco->quantidade == 0)
+    {
+        printf("O programa nao possui perguntas para serem alteradas !\n");
+        return 0;
+    }
+
+    printf("Digite o numero da pergunta : ");
+    scanf(" %d", &indice);
+
+    while(getchar() != '\n');
+
+    if(indice < 1 || indice > banco->quantidade)
+    {
+        printf("Numero invalido !\n");
+        return 0;
+    }
+
+    numero_real = indice - 1;
+
+    char texto[300];
+    int nova_dificuldade;
+    int nova_categoria;
+    
+    //ler enunciado 
+    do
+    {
+        printf("Digite o novo enunciado da questão :");
+        fgets(texto, sizeof(texto), stdin);
+        texto[strcspn(texto, "\n")] = '\0';
+
+        if (strlen(texto) > 200)
+        {
+            printf("Pergunta muito grande !\n");
+        }
+        else if(strlen(texto) == 0)
+        {
+            printf("O enunciado não pode ser vazio !\n");
+        }
+        else if(strchr(texto, '"') != NULL)
+        {
+            printf("Não use aspas no texto !\n");
+        }
+
+    } while (strlen(texto) > 200 || strlen(texto) == 0 || strchr(texto, '"') != NULL);
+
+    strcpy(banco->perguntas[numero_real].conteudo_da_pergunta, texto);//copia a string para o lugar correto
+
+    //le os enunciados das quatro alternativas
+    for(int i = 0 ; i < 4 ; i++)
+    {
+        do
+        {
+            printf("Digite a nova alternativa %c : ", 'A'+i);
+            fgets(texto, sizeof(texto), stdin);
+            texto[strcspn(texto, "\n")] = '\0';
+
+            if (strlen(texto) > 200)
+            {
+                printf("Alternativa muito grande !\n");
+            }
+            else if(strlen(texto) == 0)
+            {
+                printf("A alternativa não pode ser vazia !\n");
+            }
+            else if(strchr(texto, '"') != NULL)
+            {
+                printf("Não use aspas no texto !\n");
+            }
+
+        } while (strlen(texto) > 200 || strlen(texto) == 0 || strchr(texto, '"') != NULL);
+
+        strcpy(banco->perguntas[numero_real].alternativas[i], texto);
+    }
+
+    //le a alternativa certa 
+    do
+    {
+        printf("Digite a alternativa correta (A-D) : ");
+        scanf(" %c", &banco->perguntas[numero_real].alternativa_correta);
+
+        if(toupper(banco->perguntas[numero_real].alternativa_correta) < 'A' || toupper(banco->perguntas[numero_real].alternativa_correta) > 'D')
+        {
+            printf("Alternativa inválida !\n");
+        }
+
+        while(getchar() != '\n');
+    } while (toupper(banco->perguntas[numero_real].alternativa_correta) < 'A' || toupper(banco->perguntas[numero_real].alternativa_correta) > 'D');
+
+    banco->perguntas[numero_real].alternativa_correta = toupper(banco->perguntas[numero_real].alternativa_correta);
+    
+    //le a dificuldade
+    do
+    {
+        nova_dificuldade = 0;
+
+        printf("Digite a dificuldade (1 - Muito fácil, 2 - Fácil, 3 - Médio, 4 - Difícil, 5 - Impossível): ");
+        scanf(" %d", &nova_dificuldade);
+
+        if(nova_dificuldade < 1 || nova_dificuldade > 5)
+        {
+            printf("Dificuldade inválida !\n");
+        }
+
+        while(getchar() != '\n');
+    } while (nova_dificuldade < 1 || nova_dificuldade > 5);
+
+    banco->perguntas[numero_real].dificuldades = (Dificuldade) nova_dificuldade;
+
+    //le a categoria
+    do
+    {
+        nova_categoria = 0;
+
+        printf("Digite a categoria (1 - Geek, 2 - Esportes, 3 - Matematica, 4 - Geografia, 5 - Biologia): ");
+        scanf(" %d", &nova_categoria);
+
+        if(nova_categoria < 1 || nova_categoria > 5)
+        {
+            printf("Categoria inválida !\n");
+        }
+
+        while(getchar() != '\n');
+    } while (nova_categoria < 1 || nova_categoria > 5);
+
+    banco->perguntas[numero_real].categorias = (Categoria) nova_categoria;
+    
+    return 1;
+}
