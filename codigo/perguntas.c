@@ -260,7 +260,7 @@ int lerPergunta(Pergunta *perguntas)
     //ler enunciado 
     do
     {
-        printf("Digite o enunciado da questao\n");
+        printf("Digite o enunciado da questão :");
         fgets(texto, sizeof(texto), stdin);
         texto[strcspn(texto, "\n")] = '\0';
 
@@ -270,11 +270,11 @@ int lerPergunta(Pergunta *perguntas)
         }
         else if(strlen(texto) == 0)
         {
-            printf("O enunciado nao pode ser vazio !\n");
+            printf("O enunciado não pode ser vazio !\n");
         }
         else if(strchr(texto, '"') != NULL)
         {
-            printf("Nao use aspas no texto !\n");
+            printf("Não use aspas no texto !\n");
         }
 
     } while (strlen(texto) > 200 || strlen(texto) == 0 || strchr(texto, '"') != NULL);
@@ -296,11 +296,11 @@ int lerPergunta(Pergunta *perguntas)
             }
             else if(strlen(texto) == 0)
             {
-                printf("A alternativa nao pode ser vazia !\n");
+                printf("A alternativa não pode ser vazia !\n");
             }
             else if(strchr(texto, '"') != NULL)
             {
-                printf("Nao use aspas no texto !\n");
+                printf("Não use aspas no texto !\n");
             }
 
         } while (strlen(texto) > 200 || strlen(texto) == 0 || strchr(texto, '"') != NULL);
@@ -316,7 +316,7 @@ int lerPergunta(Pergunta *perguntas)
 
         if(toupper(perguntas->alternativa_correta) < 'A' || toupper(perguntas->alternativa_correta) > 'D')
         {
-            printf("Alternativa invalida !\n");
+            printf("Alternativa inválida !\n");
         }
 
         while(getchar() != '\n');
@@ -329,12 +329,12 @@ int lerPergunta(Pergunta *perguntas)
     {
         dificuldade = 0;
 
-        printf("Digite a dificuldade (1 - Muito facil, 2 - Facil, 3 - Medio, 4 - Dificil, 5 - Impossivel): ");
+        printf("Digite a dificuldade (1 - Muito fácil, 2 - Fácil, 3 - Médio, 4 - Difícil, 5 - Impossível): ");
         scanf(" %d", &dificuldade);
 
         if(dificuldade < 1 || dificuldade > 5)
         {
-            printf("Dificuldade invalida !\n");
+            printf("Dificuldade inválida !\n");
         }
 
         while(getchar() != '\n');
@@ -345,6 +345,7 @@ int lerPergunta(Pergunta *perguntas)
     return 1;
 }
 
+//salva as perguntas no banco de perguntas
 int adicionaPerguntas(BancoPerguntas *banco, Pergunta *perguntas)
 {
     //bloco copiado da funcao acima, sem fclose(arq)
@@ -386,6 +387,7 @@ int adicionaPerguntas(BancoPerguntas *banco, Pergunta *perguntas)
     return 1;
 }
 
+//printa as perguntas no arquivo csv
 int salvaPergunta(BancoPerguntas *banco, char *nome_arq)
 {
     FILE *arq;
@@ -413,6 +415,49 @@ int salvaPergunta(BancoPerguntas *banco, char *nome_arq)
     }
 
     fclose(arq);
+
+    return 1;
+}
+
+int listaPergunta (BancoPerguntas *banco)
+{
+    if(banco->quantidade == 0)
+    {
+        printf("Nenhuma pergunta cadastrada !\n");
+        return 0;
+    }
+
+    for(int i = 0 ; i < banco->quantidade ; i++)
+    {
+        printf("====== Pergunta %d ======\n", i+1);
+        printf("%s\n", banco->perguntas[i].conteudo_da_pergunta);
+        printf(" A) %s\n", banco->perguntas[i].alternativas[0]);
+        printf(" B) %s\n", banco->perguntas[i].alternativas[1]);
+        printf(" C) %s\n", banco->perguntas[i].alternativas[2]);
+        printf(" D) %s\n", banco->perguntas[i].alternativas[3]);
+        switch (banco->perguntas[i].dificuldades)
+        {
+        case MUITO_FACIL:
+            printf("Alternativa correta : %c | Dificuldade : Muito fácil\n\n", banco->perguntas[i].alternativa_correta);
+            break;
+        
+        case FACIL:
+            printf("Alternativa correta : %c | Dificuldade : Fácil\n\n", banco->perguntas[i].alternativa_correta);
+            break;
+
+        case MEDIO:
+            printf("Alternativa correta : %c | Dificuldade : Médio\n\n", banco->perguntas[i].alternativa_correta);
+            break;
+
+        case DIFICIL:
+            printf("Alternativa correta : %c | Dificuldade : Difícil\n\n", banco->perguntas[i].alternativa_correta);
+            break;
+
+        case IMPOSSIVEL:
+            printf("Alternativa correta : %c | Dificuldade : Impossível\n\n", banco->perguntas[i].alternativa_correta);
+            break;
+        }
+    }
 
     return 1;
 }

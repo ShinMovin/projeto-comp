@@ -24,7 +24,7 @@ int sorteaPergunta (BancoPerguntas *banco, Dificuldade dificuldades);//feito
 void liberaBancoPergunta (BancoPerguntas *banco);//feito
 int lerPergunta(Pergunta *perguntas);//feito
 int adicionaPerguntas(BancoPerguntas *banco, Pergunta *perguntas);//feito
-int salvaPergunta(BancoPerguntas *banco, char *nome_arq);
+int salvaPergunta(BancoPerguntas *banco, char *nome_arq);//feito
 int listaPergunta (BancoPerguntas *banco);
 int pesquisaPergunta (BancoPerguntas *banco);
 int alteraPergunta (BancoPerguntas *banco);
