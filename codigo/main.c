@@ -24,13 +24,15 @@ int main(){
 
     do
     {
-        printf(" ====== MENU ======\n");
+        printf("======= MENU =======\n");
         printf("1 - Listar perguntas\n2 - Cadastrar pergunta\n3 - Pesquisar pergunta\n4 - Alterar pergunta\n5 - Excluir pergunta\n0 - Sair\n");
-        
+        printf("====================\n");
+
         opcao = -1;
 
         printf("Opção :");
         scanf(" %d", &opcao);
+        printf("\n");
 
         while(getchar() != '\n');
 
