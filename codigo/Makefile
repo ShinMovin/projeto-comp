@@ -1,16 +1,57 @@
+# Makefile do projeto (funciona no Linux e no Windows)
+#
+# Use dentro da pasta codigo/:
+#   make                -> compila o jogo (menu de perguntas)
+#   make run            -> compila e executa o jogo
+#   make guitarhero     -> compila o minigame Guitar Hero sozinho
+#   make run-guitarhero -> compila e executa o Guitar Hero
+#   make clean          -> apaga os executaveis
+#
+# Os executaveis ficam na pasta compilado/ (ignorada pelo git).
+
 CC = gcc
 CFLAGS = -Wall -Wextra
-LIBS = -lraylib -lm
 
+# Detecta o sistema: no Windows a raylib precisa de mais bibliotecas
+ifeq ($(OS),Windows_NT)
+    EXT = .exe
+    CFLAGS += $(shell pkg-config --cflags raylib)
+    LIBS = $(shell pkg-config --libs raylib) -lopengl32 -lgdi32 -lwinmm -lm
+else
+    EXT =
+    LIBS = -lraylib -lm
+endif
+
+PASTA = ../compilado
+
+# Jogo principal (menu de perguntas)
+# Quando criar um .c novo do jogo, acrescente o nome dele aqui
 FONTES = main.c perguntas.c
-SAIDA = ../compilado/jogo
+JOGO = $(PASTA)/jogo$(EXT)
 
-all:
-	mkdir -p ../compilado
-	$(CC) $(CFLAGS) $(FONTES) -o $(SAIDA) $(LIBS)
+# Minigame Guitar Hero (tem main proprio, por isso compila separado)
+GUITARHERO_FONTES = minigames/guitarhero/guitarhero.c
+GUITARHERO = $(PASTA)/guitarhero$(EXT)
 
-run: all
-	$(SAIDA)
+.PHONY: all run guitarhero run-guitarhero clean
+
+all: $(JOGO)
+
+$(JOGO): $(FONTES) $(wildcard *.h)
+	mkdir -p $(PASTA)
+	$(CC) $(CFLAGS) $(FONTES) -o $@ $(LIBS)
+
+run: $(JOGO)
+	$(JOGO)
+
+guitarhero: $(GUITARHERO)
+
+$(GUITARHERO): $(GUITARHERO_FONTES)
+	mkdir -p $(PASTA)
+	$(CC) -std=c99 $(CFLAGS) $(GUITARHERO_FONTES) -o $@ $(LIBS)
+
+run-guitarhero: $(GUITARHERO)
+	$(GUITARHERO)
 
 clean:
-	rm -f $(SAIDA)
+	rm -f $(JOGO) $(GUITARHERO)
