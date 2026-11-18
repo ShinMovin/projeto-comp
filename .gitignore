@@ -2,4 +2,4 @@
 *.exe
 a.out
 compilado/
-dados/perguntas.bin
+dados/perguntas_exportadas.csv
