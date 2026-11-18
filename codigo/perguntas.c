@@ -272,8 +272,12 @@ int lerPergunta(Pergunta *perguntas)
         {
             printf("O enunciado nao pode ser vazio !\n");
         }
+        else if(strchr(texto, '"') != NULL)
+        {
+            printf("Nao use aspas no texto !\n");
+        }
 
-    } while (strlen(texto) > 200 || strlen(texto) == 0);
+    } while (strlen(texto) > 200 || strlen(texto) == 0 || strchr(texto, '"') != NULL);
 
     strcpy(perguntas->conteudo_da_pergunta, texto);//copia a string para o lugar correto
     
@@ -294,8 +298,12 @@ int lerPergunta(Pergunta *perguntas)
             {
                 printf("A alternativa nao pode ser vazia !\n");
             }
+            else if(strchr(texto, '"') != NULL)
+            {
+                printf("Nao use aspas no texto !\n");
+            }
 
-        } while (strlen(texto) > 200 || strlen(texto) == 0);
+        } while (strlen(texto) > 200 || strlen(texto) == 0 || strchr(texto, '"') != NULL);
 
         strcpy(perguntas->alternativas[i], texto);
     }
@@ -333,8 +341,78 @@ int lerPergunta(Pergunta *perguntas)
     } while (dificuldade < 1 || dificuldade > 5);
 
     perguntas->dificuldades = (Dificuldade) dificuldade;
+    
+    return 1;
+}
 
-    
-    
+int adicionaPerguntas(BancoPerguntas *banco, Pergunta *perguntas)
+{
+    //bloco copiado da funcao acima, sem fclose(arq)
+    //verifica se o tamanho do vetor é suficiente para armazenar mais perguntas
+    if((*banco).quantidade == (*banco).capacidade)
+    {   
+        int novaCapacidade = (*banco).capacidade * 2;
+
+        Pergunta *temp = realloc((*banco).perguntas, novaCapacidade * sizeof(Pergunta));
+        if(temp == NULL){
+            printf("Erro ao aumentar memoria!\n");
+            return 0;
+        }
+
+        (*banco).perguntas = temp;
+
+        bool *tempUsadas = realloc((*banco).usadas, novaCapacidade * sizeof(bool));
+        if(tempUsadas == NULL){
+            printf("Erro ao aumentar memoria!\n");
+            return 0;
+        }
+
+        (*banco).usadas = tempUsadas;
+
+        for(int i = (*banco).capacidade; i < novaCapacidade; i++){
+            (*banco).usadas[i] = false;
+        }
+
+        (*banco).capacidade = novaCapacidade;
+
+    }
+
+    //coloca a pergunta na primeira posicao livre
+    banco->perguntas[banco->quantidade] = *perguntas; 
+    banco->usadas[banco->quantidade] = false;
+
+    banco->quantidade++;
+
+    return 1;
+}
+
+int salvaPergunta(BancoPerguntas *banco, char *nome_arq)
+{
+    FILE *arq;
+
+    arq = fopen(nome_arq, "w");
+
+    if(arq == NULL)
+    {
+        perror("Erro ao abrir o arquivo.");
+        return 0;
+    }
+
+    fprintf(arq, "enunciado,alternativa_A,alternativa_B,alternativa_C,alternativa_D,alternativa_correta,dificuldade\n");
+
+    for(int i = 0 ; i < banco->quantidade ; i++)
+    {
+        fprintf(arq, "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%c,%d\n",
+                banco->perguntas[i].conteudo_da_pergunta,
+                banco->perguntas[i].alternativas[0], 
+                banco->perguntas[i].alternativas[1], 
+                banco->perguntas[i].alternativas[2], 
+                banco->perguntas[i].alternativas[3], 
+                banco->perguntas[i].alternativa_correta, 
+                banco->perguntas[i].dificuldades);
+    }
+
+    fclose(arq);
+
     return 1;
 }
