@@ -616,3 +616,61 @@ int pesquisaPergunta(BancoPerguntas *banco)
 
     return encontradas;
 }
+
+int excluiPergunta(BancoPerguntas *banco)
+{
+
+    int indice_removido = 0;
+
+    if(banco->quantidade == 0)
+    {
+        printf("O programa nao possui perguntas !\n");
+        return 0;
+    }
+
+    printf("Digite o indice da pergunta a ser removida : ");
+    scanf(" %d", &indice_removido);
+
+    while(getchar() != '\n');
+
+    if(indice_removido < 1 || indice_removido > banco->quantidade)
+    {
+        printf("Indice invalido !\n");
+        return 0;
+    }
+
+    for(int i = (indice_removido - 1) ; i < banco->quantidade - 1 ; i++)
+    {
+        banco->perguntas[i] = banco->perguntas[i + 1];
+        banco->usadas[i] = banco->usadas[i + 1];
+    }
+
+    banco->quantidade--;
+
+    //realocar memoria
+    if(banco->quantidade <= banco->capacidade / 4 && banco->capacidade > 5)
+    {   
+        int novaCapacidade = banco->capacidade / 2;
+
+        Pergunta *temp = realloc(banco->perguntas, novaCapacidade * sizeof(Pergunta));
+
+        bool *tempUsadas = realloc(banco->usadas, novaCapacidade * sizeof(bool));
+
+        if(temp != NULL)
+        {
+            banco->perguntas = temp;
+        }
+
+        if(tempUsadas != NULL)
+        {
+            banco->usadas = tempUsadas;
+        }
+
+        if(temp != NULL && tempUsadas != NULL)
+        {
+            banco->capacidade = novaCapacidade;
+        }
+    }
+
+    return 1;
+}

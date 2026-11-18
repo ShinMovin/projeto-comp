@@ -28,8 +28,8 @@ int lerPergunta(Pergunta *perguntas);//feito
 int adicionaPerguntas(BancoPerguntas *banco, Pergunta *perguntas);//feito
 int salvaPergunta(BancoPerguntas *banco, char *nome_arq);//feito
 int listaPergunta (BancoPerguntas *banco);//feito
-int pesquisaPergunta (BancoPerguntas *banco);
+int pesquisaPergunta (BancoPerguntas *banco);//feito
 int alteraPergunta (BancoPerguntas *banco);
-int excluiPergunta (BancoPerguntas *banco);
+int excluiPergunta (BancoPerguntas *banco);//feito
 
 #endif 
