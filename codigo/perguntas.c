@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 int inicializaBanco(BancoPerguntas *banco){
     (*banco).quantidade = 0;
@@ -36,6 +37,61 @@ void liberaBancoPergunta(BancoPerguntas *banco){
     (*banco).capacidade = 0;
 }
 
+//le um campo do texto a partir da posicao
+int lerString(const char *texto, int *posicao, char *destino)
+{
+    int i = *posicao;
+    int j = 0;
+
+    if(texto[i] == '"')
+    {
+        i++;
+        while(texto[i] != '"')
+        {
+            if(texto[i] == '\n' || texto[i] == '\0' || texto[i] == '\r')
+            {
+                printf("Erro : aspas sem fechar !\n");
+                return 0;
+            }
+            if(j == 200)
+            {
+                printf("Erro : texto muito longo !\n");
+                return 0;
+            }
+            destino[j] = texto[i];
+            i++;
+            j++;
+        }
+
+        i++;
+    }
+    else
+    {
+        while (texto[i] != '\n' && texto[i] != '\0' && texto[i] != ',' && texto[i] != '\r' && j < 200)
+        {
+            destino[j] = texto[i];
+            i++;
+            j++;
+        }
+    }
+
+    destino[j] = '\0';
+
+    if(j== 0)
+    {
+        printf("Erro : campo vazio !\n");
+        return 0;
+    }
+    if(texto[i] != ',')
+    {
+        printf("Erro : campo mal formado / muito longo\n");
+        return 0;
+    }
+
+    *posicao = i;
+    return 1;
+}
+
 int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
     FILE *arq;
     
@@ -50,7 +106,7 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
 
     while(fgets(linha, sizeof(linha), arq) != NULL){
         Pergunta pergunta;
-        int j = 0, i = 0;
+        int i = 0;
 
         if((*banco).quantidade == (*banco).capacidade){   //verifica se o tamanho do vetor é suficiente para armazenar mais perguntas
             int novaCapacidade = (*banco).capacidade * 2;
@@ -81,15 +137,8 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
 
         }//if
 
-        for(; linha[i] != '\0' && linha[i] != ',' && j < 200 ; i++){
-            pergunta.conteudo_da_pergunta[j] = linha[i];
-            j++;
-        }
-        pergunta.conteudo_da_pergunta[j] = '\0';
-
-        if(j == 0 || linha[i] != ','){
-            //verificando se tá tudo errado
-            printf("Erro: enunciado vazio, muito longo ou incompleto!\n");
+        if(lerString(linha, &i, pergunta.conteudo_da_pergunta) == 0)
+        {
             fclose(arq);
             return 0;
         }
@@ -102,19 +151,9 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
                 return 0;
             }//if
 
-            i++;    // pula o ',' anterior
-            j = 0;  // reinicia a posição do caracter
-
-            for(; linha[i] != '\0' && linha[i] != ';' && j < 200; i++){  //já verifica se ultrapassa o tamanho que colocou pras perguntas e alternativas
-                pergunta.alternativas[n][j] = linha[i];
-                j++;
-            }//for
-
-            pergunta.alternativas[n][j] = '\0';
-
-            //verificando se tá tudo errado
-            if(j == 0 || linha[i] != ','){
-                printf("Erro: alternativa vazia, muito longa ou incompleta!\n");
+            i++;  // pula o ',' anterior
+            if(lerString(linha, &i, pergunta.alternativas[n]) == 0)
+            {
                 fclose(arq);
                 return 0;
             }//if
@@ -126,16 +165,16 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
             return 0;
         }//if
 
-        i++;  //pula o ';' depois da alternativa D
+        i++;  //pula o ',' depois da alternativa D
         //verificando se a alternativa tá no intervalo correto
-        if(linha[i] < '0' || linha[i] > '3'){
+        if(toupper(linha[i]) < 'A' || toupper(linha[i]) > 'D'){
             printf("Erro: alternativa correta fora do intervalo!\n");
             fclose(arq);
             return 0;
         }
-        pergunta.alternativa_correta = linha[i] - '0';  //serve pra converter a string "char linha" em um int
+        pergunta.alternativa_correta = toupper(linha[i]);  //passar a letra para maiuscula
 
-        i ++;  //vai pro caracter ';' 
+        i ++;  //vai para ',' depois da letra correta
         //verificando se tem separador no lugar certo
         if(linha[i] != ','){
             printf("Erro: separador ausente!\n");
@@ -143,7 +182,7 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
             return 0;
         }
 
-        i++; //pula o ';'
+        i++; //pula o ','
         //verificando se a dificuldade foi digitada certa
         if(linha[i] < '1' || linha[i] > '5'){
             printf("Erro: dificuldade invalida!\n");
@@ -151,7 +190,7 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
             return 0;
         }
         
-        pergunta.dificuldades = (Dificuldade)(linha[i] - '0');  //serve pra converter a string "char linha" em um int
+        pergunta.dificuldades = (Dificuldade)(linha[i] - '0');  //converte os caracteres ('1' a '5') no numero da dificuldade
 
         i++;
         //verificando se tem algo depois da dificuldade
@@ -203,15 +242,16 @@ int sorteaPergunta(BancoPerguntas *banco, Dificuldade dificuldades)
                 banco->usadas[i] = true;
                 return i;//devolve indice desejado
             }
+            sorteadas--;
         }
-        sorteadas--;
+        
     }
 
-    //retorna erro caso na entre no if correto para retornar o i
+    //retorna erro caso nao entre no if correto para retornar o i
     return -1;
 }
 
-int cadastraPergunta(BancoPerguntas *banco)
+int lerPergunta(Pergunta *perguntas)
 {
     
 }
