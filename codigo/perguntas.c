@@ -462,7 +462,69 @@ int listaPergunta (BancoPerguntas *banco)
     return 1;
 }
 
-int pesquisePergunta(BancoPerguntas *BancoPerguntas)
+int pesquisaPergunta(BancoPerguntas *banco)
 {
-    
+    char texto[201];
+    int encontradas = 0;
+
+    if(banco->quantidade == 0)
+    {
+        printf("Ainda nao existem perguntas no programa !\n");
+        return 0;
+    }
+
+    printf("Digite o enunciado da pergunta que deseja encontrar : ");
+    fgets(texto, sizeof(texto), stdin);
+    texto[strcspn(texto, "\n")] = '\0';
+
+    if(strlen(texto) == 0)
+    {
+        printf("Busca invalida !\n");
+        return 0;
+    }
+
+    for(int i = 0 ; i < banco->quantidade ; i++)
+    {
+        if(strstr(banco->perguntas[i].conteudo_da_pergunta, texto) != NULL)
+        {
+            encontradas++;
+
+            printf("====== Pergunta %d ======\n", i+1);
+            printf("%s\n", banco->perguntas[i].conteudo_da_pergunta);
+            printf(" A) %s\n", banco->perguntas[i].alternativas[0]);
+            printf(" B) %s\n", banco->perguntas[i].alternativas[1]);
+            printf(" C) %s\n", banco->perguntas[i].alternativas[2]);
+            printf(" D) %s\n", banco->perguntas[i].alternativas[3]);
+            switch (banco->perguntas[i].dificuldades)
+            {
+            case MUITO_FACIL:
+                printf("Alternativa correta : %c | Dificuldade : Muito fácil\n\n", banco->perguntas[i].alternativa_correta);
+                break;
+            
+            case FACIL:
+                printf("Alternativa correta : %c | Dificuldade : Fácil\n\n", banco->perguntas[i].alternativa_correta);
+                break;
+
+            case MEDIO:
+                printf("Alternativa correta : %c | Dificuldade : Médio\n\n", banco->perguntas[i].alternativa_correta);
+                break;
+
+            case DIFICIL:
+                printf("Alternativa correta : %c | Dificuldade : Difícil\n\n", banco->perguntas[i].alternativa_correta);
+                break;
+
+            case IMPOSSIVEL:
+                printf("Alternativa correta : %c | Dificuldade : Impossível\n\n", banco->perguntas[i].alternativa_correta);
+                break;
+            }
+        }
+    }
+
+    if(encontradas == 0)
+    {
+        printf("Nao foram encontradas perguntas relacionadas a sua busca !\n");
+        return 0;
+    }
+
+    return encontradas;
 }
