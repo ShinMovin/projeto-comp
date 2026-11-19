@@ -3,8 +3,14 @@
 
 void jogar(BancoPerguntas *banco)
 {
-    InitWindow(800, 600, "Show do Milhao");
+    InitWindow(1280, 720, "Show do Milhao");
     SetTargetFPS(60);
+
+    Jogo jogo;
+
+    jogo.rodada = 0;
+    jogo.premio = 0;
+    jogo.estado = SORTEA;
 
     while(!WindowShouldClose())
     {
