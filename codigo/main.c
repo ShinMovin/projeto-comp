@@ -4,6 +4,7 @@
 #include "perguntas.h"
 #include "raylib.h"
 #include <time.h>
+#include "jogo.h"
 
 int main(){
     BancoPerguntas banco;
@@ -78,6 +79,10 @@ int main(){
             {
                 printf("Perguntas exportadas para dados/perguntas_exportadas.csv\n");
             }
+            break;
+
+        case 7:
+            jogar(&banco);
             break;
 
         case 0:
