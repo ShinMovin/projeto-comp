@@ -31,7 +31,7 @@ int main(){
     do
     {
         printf("======= MENU =======\n");
-        printf("1 - Listar perguntas\n2 - Cadastrar pergunta\n3 - Pesquisar pergunta\n4 - Alterar pergunta\n5 - Excluir pergunta\n6 - Exportar perguntas para CSV\n0 - Sair\n");
+        printf("1 - Listar perguntas\n2 - Cadastrar pergunta\n3 - Pesquisar pergunta\n4 - Alterar pergunta\n5 - Excluir pergunta\n6 - Exportar perguntas para CSV\n7 - Jogar\n0 - Sair\n");
         printf("====================\n");
 
         opcao = -1;
