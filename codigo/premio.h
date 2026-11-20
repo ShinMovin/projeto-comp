@@ -12,9 +12,19 @@
 #define PREMIO_H
 #include "perguntas.h"
 
+/**
+ * @brief Valor de uma pergunta, usando a maior entre as duas dificuldades.
+ * @param difBase dificuldade da rodada
+ * @param difFinal dificuldade depois da roleta
+ * @return valor em reais
+ */
 int valorPergunta(int difBase, int difFinal);
 
-
+/**
+ * @brief Dificuldade base de uma rodada.
+ * @param rodada rodada de 0 a 14
+ * @return dificuldade de 1 a 5
+ */
 int dificuldadeRodada(int rodada);
 
 #endif

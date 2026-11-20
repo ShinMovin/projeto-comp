@@ -25,6 +25,10 @@ typedef struct
     char resposta;
 }Jogo;
 
+/**
+ * @brief Abre a janela e roda uma partida.
+ * @param banco banco de perguntas
+ */
 void jogar(BancoPerguntas *banco);
 
 #endif

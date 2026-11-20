@@ -15,7 +15,7 @@ PASTA = ../compilado
 
 # Jogo principal (menu de perguntas)
 # Quando criar um .c novo do jogo, acrescente o nome dele aqui
-FONTES = main.c perguntas.c jogo.c premio.c
+FONTES = main.c perguntas.c jogo.c premio.c interface.c
 JOGO = $(PASTA)/jogo$(EXT)
 
 # Minigame Guitar Hero (tem main proprio, por isso compila separado)

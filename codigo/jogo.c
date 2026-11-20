@@ -24,9 +24,9 @@ void jogar(BancoPerguntas *banco)
     jogo.premio = 0;
     jogo.estado = SORTEA;
 
-    for(int i = 0 ; i < banco->quantidade ; i++)
+    for(int i = 0 ; i < banco->capacidade ; i++)
     {
-        
+        banco->usadas[i] = false;
     }
 
     while(!WindowShouldClose())

@@ -10,9 +10,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h> 
 #include "perguntas.h"
-#include "raylib.h"
 #include <time.h>
 #include "jogo.h"
 
