@@ -1,14 +1,3 @@
-# Makefile do projeto (funciona no Linux e no Windows)
-#
-# Use dentro da pasta codigo/:
-#   make                -> compila o jogo (menu de perguntas)
-#   make run            -> compila e executa o jogo
-#   make guitarhero     -> compila o minigame Guitar Hero sozinho
-#   make run-guitarhero -> compila e executa o Guitar Hero
-#   make clean          -> apaga os executaveis
-#
-# Os executaveis ficam na pasta compilado/ (ignorada pelo git).
-
 CC = gcc
 CFLAGS = -Wall -Wextra
 
@@ -26,7 +15,7 @@ PASTA = ../compilado
 
 # Jogo principal (menu de perguntas)
 # Quando criar um .c novo do jogo, acrescente o nome dele aqui
-FONTES = main.c perguntas.c jogo.c
+FONTES = main.c perguntas.c jogo.c premio.c
 JOGO = $(PASTA)/jogo$(EXT)
 
 # Minigame Guitar Hero (tem main proprio, por isso compila separado)

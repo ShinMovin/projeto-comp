@@ -1,3 +1,13 @@
+/**
+ * @file jogo.h
+ * @author VGA
+ * @brief Estados e struct da partida.
+ * @version 0.1
+ * @date 2026-11-19
+ * 
+ * @copyright Copyright (c) 2026
+ * 
+ */
 #ifndef JOGO_H
 #define JOGO_H
 #include "perguntas.h"

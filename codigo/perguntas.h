@@ -1,3 +1,13 @@
+/**
+ * @file perguntas.h
+ * @author VGA
+ * @brief Tipos e funcoes do banco de perguntas.
+ * @version 0.1
+ * @date 2026-11-19
+ * 
+ * @copyright Copyright (c) 2026
+ * 
+ */
 #ifndef PERGUNTAS_H
 #define PERGUNTAS_H
 #include <stdbool.h>

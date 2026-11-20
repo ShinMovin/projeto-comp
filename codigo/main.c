@@ -1,3 +1,13 @@
+/**
+ * @file main.c
+ * @author VGA
+ * @brief Menu do terminal: gerencia o banco de perguntas e inicia o jogo.
+ * @version 0.1
+ * @date 2026-11-19
+ * 
+ * @copyright Copyright (c) 2026
+ * 
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h> 

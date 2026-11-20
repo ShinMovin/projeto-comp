@@ -1,3 +1,13 @@
+/**
+ * @file perguntas.c
+ * @author VGA
+ * @brief Banco de perguntas: CSV, binario, sorteio e CRUD.
+ * @version 0.1
+ * @date 2026-11-19
+ * 
+ * @copyright Copyright (c) 2026
+ * 
+ */
 #include "perguntas.h"
 #include <stdio.h>
 #include <stdlib.h>
