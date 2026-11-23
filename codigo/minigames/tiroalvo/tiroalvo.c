@@ -207,7 +207,7 @@ int main(void)
     const Faixa faixas[] = {
         {"I Wonder", "musica-local.mp3", 154.0f},
         {"Master", "master.mp3", 340.0f},
-        {"Eu, Você, o Mar e Ela", "eu-voce-o-mar-e-ela.mp3", 53.0f}
+        {"Eu, Você, o Mar e Ela", "eu-voce-o-mar-e-ela.mp3", 54.5f}
     };
     Music musicas[sizeof faixas / sizeof faixas[0]] = {0};
     const int quantidadeFaixas = sizeof faixas / sizeof faixas[0];
