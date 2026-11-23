@@ -14,6 +14,9 @@
 #define LINHA_ACERTO 480
 #define DISTANCIA_ACERTO 35.0f
 #define MAX_ERROS 3
+#define PONTOS_POR_NOTA 100
+#define ACERTOS_POR_NIVEL 5
+#define MULTIPLICADOR_MAXIMO 4
 
 #define TELA_MENU 0
 #define TELA_JOGO 1
@@ -73,6 +76,9 @@ int main(void)
     
     int tela = TELA_MENU;
     int erros = 0;
+    int pontos = 0;
+    int combo = 0;
+    int multiplicador = 1;
     float tempoNota = 1.0f;
     const Rectangle areaBotaoJogar = {(LARGURA - 220) / 2, 260, 220, 52};
     const Rectangle areaBotaoInferior = {(LARGURA - 220) / 2, 330, 220, 52};
@@ -98,6 +104,9 @@ int main(void)
                         notas[i].ativa = false;
                     }
                     erros = 0;
+                    pontos = 0;
+                    combo = 0;
+                    multiplicador = 1;
                     tempoNota = 1.0f;
                     tela = TELA_JOGO;
                 }
@@ -111,6 +120,10 @@ int main(void)
                 const char *mensagem = TextFormat("Notas perdidas: %d/%d", erros, MAX_ERROS);
                 int xMensagem = (LARGURA - MeasureText(mensagem, 24)) / 2;
                 DrawText(mensagem, xMensagem, 235, 24, WHITE);
+
+                const char *pontuacaoFinal = TextFormat("Pontuação final: %d", pontos);
+                int xPontuacao = (LARGURA - MeasureText(pontuacaoFinal, 24)) / 2;
+                DrawText(pontuacaoFinal, xPontuacao, 270, 24, WHITE);
 
                 if (Botao(areaBotaoInferior, "Voltar ao menu"))
                 {
@@ -173,6 +186,8 @@ int main(void)
             {
                 notas[i].ativa = false;
                 erros++;
+                combo = 0;
+                multiplicador = 1;
                 if (erros == MAX_ERROS)
                 {
                     tela = TELA_DERROTA;
@@ -218,6 +233,14 @@ int main(void)
                 if (melhorNota != -1)
                 {
                     notas[melhorNota].ativa = false;
+                    combo++;
+
+                    // A divisão inteira sobe o multiplicador a cada 5 acertos seguidos.
+                    multiplicador = 1 + combo / ACERTOS_POR_NIVEL;
+                    if (multiplicador > MULTIPLICADOR_MAXIMO)
+                        multiplicador = MULTIPLICADOR_MAXIMO;
+
+                    pontos += PONTOS_POR_NOTA * multiplicador;
                 }
             }
         }
@@ -344,6 +367,8 @@ int main(void)
         }
 
         DrawText(TextFormat("Notas perdidas: %d/%d", erros, MAX_ERROS), 16, 16, 20, WHITE);
+        DrawText(TextFormat("Pontuação: %d", pontos), 16, 44, 20, WHITE);
+        DrawText(TextFormat("Combo: %d (x%d)", combo, multiplicador), 16, 72, 20, WHITE);
 
         EndDrawing();
     }
