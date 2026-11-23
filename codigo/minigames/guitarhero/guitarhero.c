@@ -16,6 +16,9 @@
 #define DURACAO_PARTIDA 30
 #define LINHA_ACERTO 480
 #define DISTANCIA_ACERTO 35.0f
+#define DISTANCIA_PERFEITO 8.0f
+#define DISTANCIA_OTIMO 20.0f
+#define DURACAO_MENSAGEM 0.75f
 #define MAX_ERROS 3
 #define PONTOS_POR_NOTA 100
 #define ACERTOS_POR_NIVEL 5
@@ -85,6 +88,9 @@ int main(void)
     int multiplicador = 1;
     float tempoNota = 1.0f;
     float tempoPartida = 0.0f;
+    const char *mensagemNota = "";
+    Color corMensagemNota = WHITE;
+    float fimMensagemNota = 0.0f;
     const Rectangle areaBotaoJogar = {(LARGURA - 220) / 2, 260, 220, 52};
     const Rectangle areaBotaoInferior = {(LARGURA - 220) / 2, 330, 220, 52};
 
@@ -118,6 +124,7 @@ int main(void)
                     multiplicador = 1;
                     tempoNota = 1.0f;
                     tempoPartida = 0.0f;
+                    fimMensagemNota = 0.0f;
                     tela = TELA_JOGO;
                 }
                 sair = Botao(areaBotaoInferior, "Sair");
@@ -133,6 +140,12 @@ int main(void)
                 }
                 int xTitulo = (LARGURA - MeasureText(titulo, 48)) / 2;
                 DrawText(titulo, xTitulo, 165, 48, corTitulo);
+
+                if (tela == TELA_DERROTA)
+                {
+                    int xNota = (LARGURA - MeasureText(mensagemNota, 24)) / 2;
+                    DrawText(mensagemNota, xNota, 120, 24, corMensagemNota);
+                }
 
                 const char *mensagem = TextFormat("Notas perdidas: %d/%d", erros, MAX_ERROS);
                 int xMensagem = (LARGURA - MeasureText(mensagem, 24)) / 2;
@@ -212,6 +225,9 @@ int main(void)
                 erros++;
                 combo = 0;
                 multiplicador = 1;
+                mensagemNota = "Nota perdida!";
+                corMensagemNota = RED;
+                fimMensagemNota = tempoPartida + DURACAO_MENSAGEM;
                 if (erros == MAX_ERROS)
                 {
                     tela = TELA_DERROTA;
@@ -258,6 +274,23 @@ int main(void)
                 {
                     notas[melhorNota].ativa = false;
                     combo++;
+
+                    if (menorDistancia <= DISTANCIA_PERFEITO)
+                    {
+                        mensagemNota = "Perfeito!";
+                        corMensagemNota = GREEN;
+                    }
+                    else if (menorDistancia <= DISTANCIA_OTIMO)
+                    {
+                        mensagemNota = "Ótimo!";
+                        corMensagemNota = SKYBLUE;
+                    }
+                    else
+                    {
+                        mensagemNota = "Bom!";
+                        corMensagemNota = GOLD;
+                    }
+                    fimMensagemNota = tempoPartida + DURACAO_MENSAGEM;
 
                     // A divisão inteira sobe o multiplicador a cada 5 acertos seguidos.
                     multiplicador = 1 + combo / ACERTOS_POR_NIVEL;
@@ -401,6 +434,12 @@ int main(void)
         DrawText(TextFormat("Combo: %d (x%d)", combo, multiplicador), 16, 72, 20, WHITE);
         int segundosRestantes = (int)ceilf(DURACAO_PARTIDA - tempoPartida);
         DrawText(TextFormat("Tempo restante: %d s", segundosRestantes), 16, 100, 20, WHITE);
+
+        if (tempoPartida < fimMensagemNota)
+        {
+            int xNota = (LARGURA - MeasureText(mensagemNota, 24)) / 2;
+            DrawText(mensagemNota, xNota, 560, 24, corMensagemNota);
+        }
 
         EndDrawing();
     }
