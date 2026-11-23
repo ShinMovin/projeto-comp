@@ -38,6 +38,7 @@ GUITARHERO = $(PASTA)/guitarhero$(EXT)
 # Minigame Tiro ao Alvo (tambem tem main proprio)
 TIROALVO_FONTES = minigames/tiroalvo/tiroalvo.c
 TIROALVO = $(PASTA)/tiroalvo$(EXT)
+TIROALVO_AUDIO = $(addprefix $(PASTA)/audio-tiroalvo/,ambiente.wav acerto.wav)
 
 .PHONY: all run guitarhero run-guitarhero tiroalvo run-tiroalvo clean
 
@@ -67,12 +68,16 @@ run-guitarhero: $(GUITARHERO)
 
 tiroalvo: $(TIROALVO)
 
-$(TIROALVO): $(TIROALVO_FONTES) Makefile $(RAYLIB_ARQUIVO)
+$(TIROALVO): $(TIROALVO_FONTES) Makefile $(RAYLIB_ARQUIVO) | $(TIROALVO_AUDIO)
 	mkdir -p "$(PASTA)"
 	$(CC) -std=c99 $(CPPFLAGS) $(RAYLIB_CFLAGS) $(CFLAGS) $(TIROALVO_FONTES) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
+
+$(PASTA)/audio-tiroalvo/%.wav: minigames/tiroalvo/audio/%.wav
+	mkdir -p "$(@D)"
+	cp "$<" "$@"
 
 run-tiroalvo: $(TIROALVO)
 	$(TIROALVO)
 
 clean:
-	rm -f $(JOGO) $(GUITARHERO) $(TIROALVO)
+	rm -f $(JOGO) $(GUITARHERO) $(TIROALVO) $(TIROALVO_AUDIO)

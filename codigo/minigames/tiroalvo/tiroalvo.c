@@ -125,6 +125,30 @@ int main(void)
     InitWindow(LARGURA, ALTURA, "Tiro ao Alvo");
     SetTargetFPS(60);
 
+    // Os arquivos de áudio ficam ao lado do executável após a compilação.
+    InitAudioDevice();
+    bool audioPronto = IsAudioDeviceReady();
+    Music ambiente = {0};
+    Sound somAcerto = {0};
+    bool temAmbiente = false;
+    bool temSomAcerto = false;
+    if (audioPronto)
+    {
+        const char *pasta = GetApplicationDirectory();
+        ambiente = LoadMusicStream(TextFormat("%saudio-tiroalvo/ambiente.wav", pasta));
+        somAcerto = LoadSound(TextFormat("%saudio-tiroalvo/acerto.wav", pasta));
+        temAmbiente = IsMusicValid(ambiente);
+        temSomAcerto = IsSoundValid(somAcerto);
+
+        if (temAmbiente)
+        {
+            ambiente.looping = true;
+            SetMusicVolume(ambiente, 0.25f);
+        }
+        if (temSomAcerto)
+            SetSoundVolume(somAcerto, 0.50f);
+    }
+
     // Começa pelo menu e posiciona os botões no centro da janela.
     int tela = TELA_MENU;
     const Rectangle areaBotaoJogar = {(LARGURA - 220) / 2, 260, 220, 52};
@@ -165,11 +189,17 @@ int main(void)
             {
                 pontos = 0;
                 tela = TELA_JOGO;
+                if (temAmbiente)
+                    PlayMusicStream(ambiente);
             }
             sair = Botao(areaBotaoSair, "Sair");
         }
         else
         {
+            // Mantém a música tocando enquanto a partida roda.
+            if (temAmbiente)
+                UpdateMusicStream(ambiente);
+
             float dt = GetFrameTime();
             Vector2 mouse = GetMousePosition();
             bool clicou = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
@@ -191,6 +221,8 @@ int main(void)
                         CheckCollisionPointCircle(mouse, alvo.centro, tipo.raio))
                     {
                         pontos += tipo.pontos;
+                        if (temSomAcerto)
+                            PlaySound(somAcerto);
                         alvo.tempoVisivel = 0.0f;
                         clicou = false;
                     }
@@ -243,7 +275,13 @@ int main(void)
             break;
     }
 
-    // Fecha a janela e libera os recursos da raylib.
+    // Libera os sons antes de fechar o dispositivo de áudio e a janela.
+    if (temSomAcerto)
+        UnloadSound(somAcerto);
+    if (temAmbiente)
+        UnloadMusicStream(ambiente);
+    if (audioPronto)
+        CloseAudioDevice();
     CloseWindow();
 
     return 0;
