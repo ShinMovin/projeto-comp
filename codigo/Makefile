@@ -38,7 +38,8 @@ GUITARHERO = $(PASTA)/guitarhero$(EXT)
 # Minigame Tiro ao Alvo (tambem tem main proprio)
 TIROALVO_FONTES = minigames/tiroalvo/tiroalvo.c
 TIROALVO = $(PASTA)/tiroalvo$(EXT)
-TIROALVO_AUDIO = $(addprefix $(PASTA)/audio-tiroalvo/,ambiente.wav acerto.wav)
+TIROALVO_AUDIO = $(addprefix $(PASTA)/audio-tiroalvo/, \
+    ambiente.wav acerto.wav master.mp3 eu-voce-o-mar-e-ela.mp3)
 ifneq ($(wildcard minigames/tiroalvo/audio/musica-local.mp3),)
     TIROALVO_AUDIO += $(PASTA)/audio-tiroalvo/musica-local.mp3
 endif

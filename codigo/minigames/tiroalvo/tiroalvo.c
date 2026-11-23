@@ -1,18 +1,25 @@
 #include "raylib.h"
+#include <math.h>
+#include <stddef.h>
 
 #define LARGURA 800
 #define ALTURA 600
 
 #define TELA_MENU 0
-#define TELA_JOGO 1
-#define TELA_FIM 2
+#define TELA_CONTAGEM 1
+#define TELA_JOGO 2
+#define TELA_FIM 3
 
-#define INICIO_MUSICA_LOCAL 154.0f // 2:34
+#define DURACAO_PARTIDA 30
+#define DURACAO_CONTAGEM 3
+#define META_PONTOS 5000
+#define PONTOS_EPICO 350
 
 #define COMUM 0
 #define RARO 1
 #define EPICO 2
 #define LENDARIO 3
+#define FALSO 4
 
 #define TRILHA_COMUM_Y 428
 #define TRILHA_RARA_Y 336
@@ -39,18 +46,32 @@ typedef struct {
     float espera;
 } Alvo;
 
+typedef struct {
+    const char *nome;
+    const char *arquivo;
+    float inicio;
+} Faixa;
+
+static void DesenharTextoCentralizado(const char *texto, int y, int tamanho, Color cor)
+{
+    DrawText(texto, (LARGURA - MeasureText(texto, tamanho)) / 2, y, tamanho, cor);
+}
+
 // Desenha o botão e retorna true quando ele é clicado.
-bool Botao(Rectangle area, const char *texto)
+bool Botao(Rectangle area, const char *texto, bool selecionado)
 {
     int tamanho = 24;
     bool sobreBotao = CheckCollisionPointRec(GetMousePosition(), area);
     Color cor = {30, 30, 30, 255};
 
-    // Muda a cor quando o cursor está sobre o botão.
-    if (sobreBotao)
+    if (selecionado)
+        cor = DARKGREEN;
+    else if (sobreBotao)
         cor = DARKGRAY;
 
     DrawRectangleRec(area, cor);
+    if (selecionado)
+        DrawRectangleLinesEx(area, 2, GREEN);
 
     // Centraliza o texto dentro do retângulo.
     int x = (int)(area.x + (area.width - MeasureText(texto, tamanho)) / 2);
@@ -109,6 +130,11 @@ Alvo CriarAlvo(int raridade, TipoAlvo tipo, const Rectangle janelas[])
         alvo.centro.x = janela.x + janela.width / 2;
         alvo.centro.y = janela.y + janela.height / 2;
     }
+    else if (raridade == FALSO)
+    {
+        // O alvo falso fica fora do percurso do alvo azul.
+        alvo.centro = (Vector2){GetRandomValue(0, 1) == 0 ? 135 : 665, TRILHA_RARA_Y};
+    }
     else
     {
         alvo.centro = (Vector2){LIMITE_LENDARIO_ESQUERDO, TRILHA_LENDARIA_Y};
@@ -128,6 +154,16 @@ int main(void)
     InitWindow(LARGURA, ALTURA, "Tiro ao Alvo");
     SetTargetFPS(60);
 
+    const Faixa faixas[] = {
+        {"I Wonder", "musica-local.mp3", 154.0f},
+        {"Master", "master.mp3", 340.0f},
+        {"Eu, Você, o Mar e Ela", "eu-voce-o-mar-e-ela.mp3", 53.0f}
+    };
+    Music musicas[sizeof faixas / sizeof faixas[0]] = {0};
+    const int quantidadeFaixas = sizeof faixas / sizeof faixas[0];
+    int faixaEscolhida = 0;
+    Music *trilha = NULL;
+
     // Os arquivos de áudio ficam ao lado do executável após a compilação.
     InitAudioDevice();
     bool audioPronto = IsAudioDeviceReady();
@@ -135,31 +171,36 @@ int main(void)
     Sound somAcerto = {0};
     bool temAmbiente = false;
     bool temSomAcerto = false;
-    bool temFaixaLocal = false;
     if (audioPronto)
     {
         const char *pasta = GetApplicationDirectory();
-        // Se houver uma faixa local, usa ela no lugar da trilha padrão.
-        const char *musicaLocal = TextFormat("%saudio-tiroalvo/musica-local.mp3", pasta);
-        if (FileExists(musicaLocal))
+        for (int i = 0; i < quantidadeFaixas; i++)
         {
-            ambiente = LoadMusicStream(musicaLocal);
-            if (IsMusicValid(ambiente))
+            const char *caminho = TextFormat("%saudio-tiroalvo/%s", pasta, faixas[i].arquivo);
+            if (!FileExists(caminho))
+                continue;
+
+            Music musica = LoadMusicStream(caminho);
+            if (!IsMusicValid(musica))
+                continue;
+
+            if (GetMusicTimeLength(musica) <= faixas[i].inicio)
             {
-                temFaixaLocal = GetMusicTimeLength(ambiente) > INICIO_MUSICA_LOCAL;
-                if (!temFaixaLocal)
-                    UnloadMusicStream(ambiente);
+                UnloadMusicStream(musica);
+                continue;
             }
+            musica.looping = false;
+            SetMusicVolume(musica, 0.25f);
+            musicas[i] = musica;
         }
-        if (!temFaixaLocal)
-            ambiente = LoadMusicStream(TextFormat("%saudio-tiroalvo/ambiente.wav", pasta));
+        ambiente = LoadMusicStream(TextFormat("%saudio-tiroalvo/ambiente.wav", pasta));
         somAcerto = LoadSound(TextFormat("%saudio-tiroalvo/acerto.wav", pasta));
         temAmbiente = IsMusicValid(ambiente);
         temSomAcerto = IsSoundValid(somAcerto);
 
         if (temAmbiente)
         {
-            ambiente.looping = !temFaixaLocal;
+            ambiente.looping = true;
             SetMusicVolume(ambiente, 0.25f);
         }
         if (temSomAcerto)
@@ -168,25 +209,43 @@ int main(void)
 
     // Começa pelo menu e posiciona os botões no centro da janela.
     int tela = TELA_MENU;
-    const Rectangle areaBotaoJogar = {(LARGURA - 220) / 2, 260, 220, 52};
-    const Rectangle areaBotaoSair = {(LARGURA - 220) / 2, 330, 220, 52};
+    const Rectangle areaBotaoJogar = {(LARGURA - 220) / 2, 420, 220, 52};
+    const Rectangle areaBotaoSair = {(LARGURA - 220) / 2, 484, 220, 52};
+    const Rectangle areaBotaoVoltar = {(LARGURA - 220) / 2, 330, 220, 52};
 
     const Rectangle janelas[] = {{86, 190, 130, 88}, {584, 190, 130, 88}};
 
     // Cor, pontos por acerto, tempo na tela, pausa até reaparecer e raio.
     const TipoAlvo tipos[] = {
-        {GREEN,  100, 2.5f, 0.45f, 31.0f},
-        {BLUE,   200, 2.0f, 1.25f, 23.0f},
-        {PURPLE, 350, 1.5f, 3.75f, 21.0f},
-        {YELLOW, 500, 1.0f, 6.50f, 14.0f}
+        {GREEN,           100, 2.5f, 0.45f, 31.0f},
+        {BLUE,            200, 2.0f, 1.25f, 23.0f},
+        {PURPLE,  PONTOS_EPICO, 1.5f, 3.75f, 21.0f},
+        {YELLOW,          500, 1.0f, 6.50f, 14.0f},
+        {RED,  -PONTOS_EPICO, 1.8f, 2.80f, 23.0f}
     };
-    const float esperasIniciais[] = {0.0f, 0.65f, 2.0f, 4.0f};
-    Alvo alvos[LENDARIO + 1] = {0};
+    const float esperasIniciais[] = {0.0f, 0.65f, 2.0f, 4.0f, 1.25f};
+    Alvo alvos[FALSO + 1] = {0};
     int pontos = 0;
+    double limite = 0.0;
 
     // Loop principal
     while (!WindowShouldClose())
     {
+        double agora = GetTime();
+        if (tela == TELA_CONTAGEM && agora >= limite)
+        {
+            tela = TELA_JOGO;
+            limite = agora + DURACAO_PARTIDA;
+            if (trilha)
+                PlayMusicStream(*trilha);
+        }
+        else if (tela == TELA_JOGO && (agora >= limite || pontos >= META_PONTOS))
+        {
+            tela = TELA_FIM;
+            if (trilha)
+                StopMusicStream(*trilha);
+        }
+
         // Limpa a janela e redesenha a tela atual a cada quadro.
         BeginDrawing();
         ClearBackground(BLACK);
@@ -194,55 +253,60 @@ int main(void)
         bool sair = false;
         if (tela == TELA_MENU)
         {
-            int xTitulo = (LARGURA - MeasureText("Tiro ao Alvo", 48)) / 2;
-            DrawText("Tiro ao Alvo", xTitulo, 165, 48, WHITE);
+            DesenharTextoCentralizado("Tiro ao Alvo", 90, 48, WHITE);
+            DesenharTextoCentralizado(TextFormat("Faça %d pontos em %d segundos", META_PONTOS, DURACAO_PARTIDA), 158, 23, RAYWHITE);
+            DesenharTextoCentralizado(TextFormat("Alvo vermelho com X: -%d pontos", PONTOS_EPICO), 190, 20, RED);
 
-            // Troca de tela no próximo quadro quando o jogador clica em Jogar.
-            if (Botao(areaBotaoJogar, "Jogar"))
+            DesenharTextoCentralizado("Escolha a música", 232, 20, RAYWHITE);
+            for (int i = 0; i < quantidadeFaixas; i++)
+            {
+                const Rectangle areaFaixa = {(LARGURA - 340) / 2, 264 + 46 * i, 340, 40};
+                if (Botao(areaFaixa, faixas[i].nome, i == faixaEscolhida))
+                    faixaEscolhida = i;
+            }
+
+            if (Botao(areaBotaoJogar, "Jogar", false))
             {
                 pontos = 0;
-                for (int raridade = COMUM; raridade <= LENDARIO; raridade++)
+                for (int raridade = COMUM; raridade <= FALSO; raridade++)
                     alvos[raridade] = (Alvo){.espera = esperasIniciais[raridade]};
 
-                tela = TELA_JOGO;
-                if (temAmbiente)
+                trilha = NULL;
+                if (IsMusicValid(musicas[faixaEscolhida]))
                 {
-                    if (temFaixaLocal)
-                    {
-                        // Prepara o trecho antes de começar a reproduzir.
-                        SeekMusicStream(ambiente, INICIO_MUSICA_LOCAL);
-                        UpdateMusicStream(ambiente);
-                    }
-                    PlayMusicStream(ambiente);
+                    trilha = &musicas[faixaEscolhida];
+                    SeekMusicStream(*trilha, faixas[faixaEscolhida].inicio);
                 }
+                else if (temAmbiente)
+                {
+                    trilha = &ambiente;
+                }
+                if (trilha)
+                    UpdateMusicStream(*trilha);
+
+                tela = TELA_CONTAGEM;
+                limite = GetTime() + DURACAO_CONTAGEM;
             }
-            sair = Botao(areaBotaoSair, "Sair");
+            sair = Botao(areaBotaoSair, "Sair", false);
         }
         else if (tela == TELA_FIM)
         {
-            int xTitulo = (LARGURA - MeasureText("Fim da partida", 48)) / 2;
-            DrawText("Fim da partida", xTitulo, 165, 48, WHITE);
+            bool venceu = pontos >= META_PONTOS;
+            DesenharTextoCentralizado(venceu ? "Vitória!" : "Tempo esgotado", 165, 48, venceu ? GREEN : RED);
+            DesenharTextoCentralizado(TextFormat("Pontuação final: %d / %d", pontos, META_PONTOS), 245, 24, WHITE);
 
-            const char *placar = TextFormat("Pontuação final: %d", pontos);
-            int xPlacar = (LARGURA - MeasureText(placar, 24)) / 2;
-            DrawText(placar, xPlacar, 245, 24, WHITE);
-
-            if (Botao(areaBotaoSair, "Voltar ao menu"))
+            if (Botao(areaBotaoVoltar, "Voltar ao menu", false))
                 tela = TELA_MENU;
+        }
+        else if (tela == TELA_CONTAGEM)
+        {
+            DesenharCabine(janelas);
+            DesenharTextoCentralizado(TextFormat("%d", (int)ceil(limite - agora)), 252, 84, WHITE);
         }
         else
         {
-            // Mantém a música tocando enquanto a partida roda.
-            if (temAmbiente)
-                UpdateMusicStream(ambiente);
-
-            // A rodada termina junto com o trecho da faixa local.
-            if (temFaixaLocal && !IsMusicStreamPlaying(ambiente))
-            {
-                tela = TELA_FIM;
-                EndDrawing();
-                continue;
-            }
+            if (trilha)
+                UpdateMusicStream(*trilha);
 
             float dt = GetFrameTime();
             Vector2 mouse = GetMousePosition();
@@ -251,7 +315,7 @@ int main(void)
             DesenharCabine(janelas);
 
             // Cada alvo tem seu próprio tempo e pode aparecer junto com os outros.
-            for (int raridade = LENDARIO; raridade >= COMUM; raridade--)
+            for (int raridade = FALSO; raridade >= COMUM; raridade--)
             {
                 Alvo alvo = alvos[raridade];
                 TipoAlvo tipo = tipos[raridade];
@@ -265,7 +329,7 @@ int main(void)
                         CheckCollisionPointCircle(mouse, alvo.centro, tipo.raio))
                     {
                         pontos += tipo.pontos;
-                        if (temSomAcerto)
+                        if (temSomAcerto && raridade != FALSO)
                             PlaySound(somAcerto);
                         alvo.tempoVisivel = 0.0f;
                         clicou = false;
@@ -305,13 +369,25 @@ int main(void)
                 {
                     DrawCircleV(alvo.centro, tipo.raio, tipo.cor);
                     DrawCircleV(alvo.centro, tipo.raio * 0.66f, BLACK);
-                    DrawCircleV(alvo.centro, tipo.raio * 0.33f, tipo.cor);
+                    if (raridade == FALSO)
+                    {
+                        Vector2 centro = alvo.centro;
+                        DrawLineEx((Vector2){centro.x - 8, centro.y - 8}, (Vector2){centro.x + 8, centro.y + 8}, 4, WHITE);
+                        DrawLineEx((Vector2){centro.x - 8, centro.y + 8}, (Vector2){centro.x + 8, centro.y - 8}, 4, WHITE);
+                    }
+                    else
+                    {
+                        DrawCircleV(alvo.centro, tipo.raio * 0.33f, tipo.cor);
+                    }
                 }
             }
 
-            DrawText(TextFormat("Pontuação: %d", pontos), 32, 33, 24, WHITE);
-            int xTitulo = LARGURA - 32 - MeasureText("Tiro ao Alvo", 20);
-            DrawText("Tiro ao Alvo", xTitulo, 35, 20, RAYWHITE);
+            DrawText(TextFormat("Pontos: %d / %d", pontos, META_PONTOS), 32, 33, 24, WHITE);
+            int segundos = (int)ceil(limite - agora);
+            const char *relogio = TextFormat("Tempo: %ds", segundos);
+            DrawText(relogio, LARGURA - 32 - MeasureText(relogio, 24), 33, 24, segundos <= 5 ? RED : WHITE);
+            if (limite - agora > DURACAO_PARTIDA - 0.8)
+                DesenharTextoCentralizado("Comece!", 546, 30, GREEN);
         }
 
         EndDrawing();
@@ -324,6 +400,11 @@ int main(void)
         UnloadSound(somAcerto);
     if (temAmbiente)
         UnloadMusicStream(ambiente);
+    for (int i = 0; i < quantidadeFaixas; i++)
+    {
+        if (IsMusicValid(musicas[i]))
+            UnloadMusicStream(musicas[i]);
+    }
     if (audioPronto)
         CloseAudioDevice();
     CloseWindow();
