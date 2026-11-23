@@ -10,7 +10,10 @@
 #define MAX_NOTAS 100
 
 #define LARGURA_TRILHA 90
-#define VELOCIDADE 250.0f
+#define VELOCIDADE_INICIAL 250.0f
+#define AUMENTO_VELOCIDADE 25.0f
+#define INTERVALO_AUMENTO 6
+#define DURACAO_PARTIDA 30
 #define LINHA_ACERTO 480
 #define DISTANCIA_ACERTO 35.0f
 #define MAX_ERROS 3
@@ -21,6 +24,7 @@
 #define TELA_MENU 0
 #define TELA_JOGO 1
 #define TELA_DERROTA 2
+#define TELA_VITORIA 3
 
 
 typedef struct {
@@ -80,6 +84,7 @@ int main(void)
     int combo = 0;
     int multiplicador = 1;
     float tempoNota = 1.0f;
+    float tempoPartida = 0.0f;
     const Rectangle areaBotaoJogar = {(LARGURA - 220) / 2, 260, 220, 52};
     const Rectangle areaBotaoInferior = {(LARGURA - 220) / 2, 330, 220, 52};
 
@@ -97,6 +102,10 @@ int main(void)
                 int xTitulo = (LARGURA - MeasureText("Guitar Hero", 48)) / 2;
                 DrawText("Guitar Hero", xTitulo, 165, 48, WHITE);
 
+                const char *objetivo = TextFormat("Sobreviva por %d segundos", DURACAO_PARTIDA);
+                int xObjetivo = (LARGURA - MeasureText(objetivo, 20)) / 2;
+                DrawText(objetivo, xObjetivo, 225, 20, WHITE);
+
                 if (Botao(areaBotaoJogar, "Jogar"))
                 {
                     for (int i = 0; i < MAX_NOTAS; i++)
@@ -108,14 +117,22 @@ int main(void)
                     combo = 0;
                     multiplicador = 1;
                     tempoNota = 1.0f;
+                    tempoPartida = 0.0f;
                     tela = TELA_JOGO;
                 }
                 sair = Botao(areaBotaoInferior, "Sair");
             }
             else
             {
-                int xTitulo = (LARGURA - MeasureText("Você perdeu!", 48)) / 2;
-                DrawText("Você perdeu!", xTitulo, 165, 48, RED);
+                const char *titulo = "Você perdeu!";
+                Color corTitulo = RED;
+                if (tela == TELA_VITORIA)
+                {
+                    titulo = "Você venceu!";
+                    corTitulo = GREEN;
+                }
+                int xTitulo = (LARGURA - MeasureText(titulo, 48)) / 2;
+                DrawText(titulo, xTitulo, 165, 48, corTitulo);
 
                 const char *mensagem = TextFormat("Notas perdidas: %d/%d", erros, MAX_ERROS);
                 int xMensagem = (LARGURA - MeasureText(mensagem, 24)) / 2;
@@ -138,6 +155,13 @@ int main(void)
         }
 
         float dt = GetFrameTime();
+        int aumentos = (int)(tempoPartida / INTERVALO_AUMENTO);
+        float velocidade = VELOCIDADE_INICIAL + aumentos * AUMENTO_VELOCIDADE;
+
+        // No último quadro, só atualiza as notas até acabar o tempo.
+        if (tempoPartida + dt > DURACAO_PARTIDA)
+            dt = DURACAO_PARTIDA - tempoPartida;
+        tempoPartida += dt;
 
         // ----------------------------------
         // 1. GERAR NOTAS
@@ -179,7 +203,7 @@ int main(void)
                 continue;
 
             // Move a nota para baixo
-            notas[i].y += VELOCIDADE * dt;
+            notas[i].y += velocidade * dt;
 
             // Uma nota conta como erro ao passar da zona de acerto.
             if (notas[i].y > LINHA_ACERTO + DISTANCIA_ACERTO)
@@ -243,6 +267,12 @@ int main(void)
                     pontos += PONTOS_POR_NOTA * multiplicador;
                 }
             }
+        }
+
+        if (tempoPartida >= DURACAO_PARTIDA)
+        {
+            tela = TELA_VITORIA;
+            continue;
         }
 
         // ----------------------------------
@@ -369,6 +399,8 @@ int main(void)
         DrawText(TextFormat("Notas perdidas: %d/%d", erros, MAX_ERROS), 16, 16, 20, WHITE);
         DrawText(TextFormat("Pontuação: %d", pontos), 16, 44, 20, WHITE);
         DrawText(TextFormat("Combo: %d (x%d)", combo, multiplicador), 16, 72, 20, WHITE);
+        int segundosRestantes = (int)ceilf(DURACAO_PARTIDA - tempoPartida);
+        DrawText(TextFormat("Tempo restante: %d s", segundosRestantes), 16, 100, 20, WHITE);
 
         EndDrawing();
     }
