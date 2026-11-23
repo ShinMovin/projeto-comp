@@ -39,6 +39,9 @@ GUITARHERO = $(PASTA)/guitarhero$(EXT)
 TIROALVO_FONTES = minigames/tiroalvo/tiroalvo.c
 TIROALVO = $(PASTA)/tiroalvo$(EXT)
 TIROALVO_AUDIO = $(addprefix $(PASTA)/audio-tiroalvo/,ambiente.wav acerto.wav)
+ifneq ($(wildcard minigames/tiroalvo/audio/musica-local.mp3),)
+    TIROALVO_AUDIO += $(PASTA)/audio-tiroalvo/musica-local.mp3
+endif
 
 .PHONY: all run guitarhero run-guitarhero tiroalvo run-tiroalvo clean
 
@@ -72,7 +75,7 @@ $(TIROALVO): $(TIROALVO_FONTES) Makefile $(RAYLIB_ARQUIVO) | $(TIROALVO_AUDIO)
 	mkdir -p "$(PASTA)"
 	$(CC) -std=c99 $(CPPFLAGS) $(RAYLIB_CFLAGS) $(CFLAGS) $(TIROALVO_FONTES) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
 
-$(PASTA)/audio-tiroalvo/%.wav: minigames/tiroalvo/audio/%.wav
+$(PASTA)/audio-tiroalvo/%: minigames/tiroalvo/audio/%
 	mkdir -p "$(@D)"
 	cp "$<" "$@"
 

@@ -5,6 +5,9 @@
 
 #define TELA_MENU 0
 #define TELA_JOGO 1
+#define TELA_FIM 2
+
+#define INICIO_MUSICA_LOCAL 154.0f // 2:34
 
 #define COMUM 0
 #define RARO 1
@@ -132,17 +135,31 @@ int main(void)
     Sound somAcerto = {0};
     bool temAmbiente = false;
     bool temSomAcerto = false;
+    bool temFaixaLocal = false;
     if (audioPronto)
     {
         const char *pasta = GetApplicationDirectory();
-        ambiente = LoadMusicStream(TextFormat("%saudio-tiroalvo/ambiente.wav", pasta));
+        // Se houver uma faixa local, usa ela no lugar da trilha padrão.
+        const char *musicaLocal = TextFormat("%saudio-tiroalvo/musica-local.mp3", pasta);
+        if (FileExists(musicaLocal))
+        {
+            ambiente = LoadMusicStream(musicaLocal);
+            if (IsMusicValid(ambiente))
+            {
+                temFaixaLocal = GetMusicTimeLength(ambiente) > INICIO_MUSICA_LOCAL;
+                if (!temFaixaLocal)
+                    UnloadMusicStream(ambiente);
+            }
+        }
+        if (!temFaixaLocal)
+            ambiente = LoadMusicStream(TextFormat("%saudio-tiroalvo/ambiente.wav", pasta));
         somAcerto = LoadSound(TextFormat("%saudio-tiroalvo/acerto.wav", pasta));
         temAmbiente = IsMusicValid(ambiente);
         temSomAcerto = IsSoundValid(somAcerto);
 
         if (temAmbiente)
         {
-            ambiente.looping = true;
+            ambiente.looping = !temFaixaLocal;
             SetMusicVolume(ambiente, 0.25f);
         }
         if (temSomAcerto)
@@ -163,12 +180,8 @@ int main(void)
         {PURPLE, 350, 1.5f, 3.75f, 21.0f},
         {YELLOW, 500, 1.0f, 6.50f, 14.0f}
     };
-    Alvo alvos[] = {
-        {.espera = 0.0f},
-        {.espera = 0.65f},
-        {.espera = 2.0f},
-        {.espera = 4.0f}
-    };
+    const float esperasIniciais[] = {0.0f, 0.65f, 2.0f, 4.0f};
+    Alvo alvos[LENDARIO + 1] = {0};
     int pontos = 0;
 
     // Loop principal
@@ -188,17 +201,48 @@ int main(void)
             if (Botao(areaBotaoJogar, "Jogar"))
             {
                 pontos = 0;
+                for (int raridade = COMUM; raridade <= LENDARIO; raridade++)
+                    alvos[raridade] = (Alvo){.espera = esperasIniciais[raridade]};
+
                 tela = TELA_JOGO;
                 if (temAmbiente)
+                {
+                    if (temFaixaLocal)
+                    {
+                        // Prepara o trecho antes de começar a reproduzir.
+                        SeekMusicStream(ambiente, INICIO_MUSICA_LOCAL);
+                        UpdateMusicStream(ambiente);
+                    }
                     PlayMusicStream(ambiente);
+                }
             }
             sair = Botao(areaBotaoSair, "Sair");
+        }
+        else if (tela == TELA_FIM)
+        {
+            int xTitulo = (LARGURA - MeasureText("Fim da partida", 48)) / 2;
+            DrawText("Fim da partida", xTitulo, 165, 48, WHITE);
+
+            const char *placar = TextFormat("Pontuação final: %d", pontos);
+            int xPlacar = (LARGURA - MeasureText(placar, 24)) / 2;
+            DrawText(placar, xPlacar, 245, 24, WHITE);
+
+            if (Botao(areaBotaoSair, "Voltar ao menu"))
+                tela = TELA_MENU;
         }
         else
         {
             // Mantém a música tocando enquanto a partida roda.
             if (temAmbiente)
                 UpdateMusicStream(ambiente);
+
+            // A rodada termina junto com o trecho da faixa local.
+            if (temFaixaLocal && !IsMusicStreamPlaying(ambiente))
+            {
+                tela = TELA_FIM;
+                EndDrawing();
+                continue;
+            }
 
             float dt = GetFrameTime();
             Vector2 mouse = GetMousePosition();
