@@ -1,6 +1,4 @@
 #include "raylib.h"
-#include <stdio.h>
-#include <stdlib.h>
 #include <math.h>
 
 
@@ -15,6 +13,11 @@
 #define VELOCIDADE 250.0f
 #define LINHA_ACERTO 480
 #define DISTANCIA_ACERTO 35.0f
+#define MAX_ERROS 3
+
+#define TELA_MENU 0
+#define TELA_JOGO 1
+#define TELA_DERROTA 2
 
 
 typedef struct {
@@ -22,6 +25,24 @@ typedef struct {
     float y;
     bool ativa;
 } Nota;
+
+// Desenha o botão e retorna true quando ele é clicado.
+bool Botao(Rectangle area, const char *texto)
+{
+    int tamanho = 24;
+    bool sobreBotao = CheckCollisionPointRec(GetMousePosition(), area);
+    Color cor = {30, 30, 45, 255};
+
+    if (sobreBotao)
+        cor = DARKGRAY;
+
+    DrawRectangleRec(area, cor);
+    int x = (int)(area.x + (area.width - MeasureText(texto, tamanho)) / 2);
+    int y = (int)(area.y + (area.height - tamanho) / 2);
+    DrawText(texto, x, y, tamanho, WHITE);
+
+    return sobreBotao && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
 
 int main(void)
 {
@@ -50,11 +71,59 @@ int main(void)
     Nota notas[MAX_NOTAS] = {0};
 
     
+    int tela = TELA_MENU;
+    int erros = 0;
     float tempoNota = 1.0f;
+    const Rectangle areaBotaoJogar = {(LARGURA - 220) / 2, 260, 220, 52};
+    const Rectangle areaBotaoInferior = {(LARGURA - 220) / 2, 330, 220, 52};
 
     // Loop principal
     while (!WindowShouldClose())
     {
+        if (tela != TELA_JOGO)
+        {
+            BeginDrawing();
+            ClearBackground(BLACK);
+
+            bool sair = false;
+            if (tela == TELA_MENU)
+            {
+                int xTitulo = (LARGURA - MeasureText("Guitar Hero", 48)) / 2;
+                DrawText("Guitar Hero", xTitulo, 165, 48, WHITE);
+
+                if (Botao(areaBotaoJogar, "Jogar"))
+                {
+                    for (int i = 0; i < MAX_NOTAS; i++)
+                    {
+                        notas[i].ativa = false;
+                    }
+                    erros = 0;
+                    tempoNota = 1.0f;
+                    tela = TELA_JOGO;
+                }
+                sair = Botao(areaBotaoInferior, "Sair");
+            }
+            else
+            {
+                int xTitulo = (LARGURA - MeasureText("Você perdeu!", 48)) / 2;
+                DrawText("Você perdeu!", xTitulo, 165, 48, RED);
+
+                const char *mensagem = TextFormat("Notas perdidas: %d/%d", erros, MAX_ERROS);
+                int xMensagem = (LARGURA - MeasureText(mensagem, 24)) / 2;
+                DrawText(mensagem, xMensagem, 235, 24, WHITE);
+
+                if (Botao(areaBotaoInferior, "Voltar ao menu"))
+                {
+                    tela = TELA_MENU;
+                }
+            }
+
+            EndDrawing();
+            if (sair)
+                break;
+            continue;
+        }
+
         float dt = GetFrameTime();
 
         // ----------------------------------
@@ -99,12 +168,21 @@ int main(void)
             // Move a nota para baixo
             notas[i].y += VELOCIDADE * dt;
 
-            // Remove notas que sairam da tela
-            if (notas[i].y > ALTURA + 20)
+            // Uma nota conta como erro ao passar da zona de acerto.
+            if (notas[i].y > LINHA_ACERTO + DISTANCIA_ACERTO)
             {
                 notas[i].ativa = false;
+                erros++;
+                if (erros == MAX_ERROS)
+                {
+                    tela = TELA_DERROTA;
+                    break;
+                }
             }
         }
+
+        if (tela == TELA_DERROTA)
+            continue;
 
         // ----------------------------------
         // 3. DETECTAR ACERTOS
@@ -264,6 +342,8 @@ int main(void)
                 WHITE
             );
         }
+
+        DrawText(TextFormat("Notas perdidas: %d/%d", erros, MAX_ERROS), 16, 16, 20, WHITE);
 
         EndDrawing();
     }
