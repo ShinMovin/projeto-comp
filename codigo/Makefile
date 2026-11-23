@@ -35,7 +35,11 @@ JOGO = $(PASTA)/jogo$(EXT)
 GUITARHERO_FONTES = minigames/guitarhero/guitarhero.c
 GUITARHERO = $(PASTA)/guitarhero$(EXT)
 
-.PHONY: all run guitarhero run-guitarhero clean
+# Minigame Tiro ao Alvo (tambem tem main proprio)
+TIROALVO_FONTES = minigames/tiroalvo/tiroalvo.c
+TIROALVO = $(PASTA)/tiroalvo$(EXT)
+
+.PHONY: all run guitarhero run-guitarhero tiroalvo run-tiroalvo clean
 
 all: $(JOGO)
 
@@ -61,5 +65,14 @@ $(GUITARHERO): $(GUITARHERO_FONTES) Makefile $(RAYLIB_ARQUIVO)
 run-guitarhero: $(GUITARHERO)
 	$(GUITARHERO)
 
+tiroalvo: $(TIROALVO)
+
+$(TIROALVO): $(TIROALVO_FONTES) Makefile $(RAYLIB_ARQUIVO)
+	mkdir -p "$(PASTA)"
+	$(CC) -std=c99 $(CPPFLAGS) $(RAYLIB_CFLAGS) $(CFLAGS) $(TIROALVO_FONTES) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
+
+run-tiroalvo: $(TIROALVO)
+	$(TIROALVO)
+
 clean:
-	rm -f $(JOGO) $(GUITARHERO)
+	rm -f $(JOGO) $(GUITARHERO) $(TIROALVO)
