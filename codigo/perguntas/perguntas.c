@@ -70,53 +70,23 @@ void liberaBancoPergunta(BancoPerguntas *banco)
     banco->capacidade = 0;
 }
 
-// Um caractere UTF-8 começa com um byte que indica quantos bytes o seguem.
-// Zero é um byte inicial inválido nesta função, usada só para caracteres não ASCII.
-static int tamanhoCaractereUtf8(unsigned char primeiro)
-{
-    if (primeiro >= 0xC2 && primeiro <= 0xDF)
-        return 2;
-    if (primeiro >= 0xE0 && primeiro <= 0xEF)
-        return 3;
-    if (primeiro >= 0xF0 && primeiro <= 0xF4)
-        return 4;
-    return 0;
-}
-
+// Um texto é válido se termina dentro do limite, não está vazio e não tem aspas
+// (que quebrariam o CSV) nem caracteres de controle como Enter e Tab (códigos abaixo de 32).
+// Letras acentuadas são aceitas como estão.
 static bool textoValido(const char *texto)
 {
-    const unsigned char *p = (const unsigned char *)texto;
-    const unsigned char *fim = memchr(p, '\0', LIMITE_TEXTO_PERGUNTA + 1);
-    if (!fim)
-        return false;
-
     bool temConteudo = false;
-    while (p < fim)
+    for (int i = 0; i <= LIMITE_TEXTO_PERGUNTA; i++)
     {
-        unsigned char byte = *p;
-        if (byte < 0x80)
-        {
-            if (byte < 32 || byte == 127 || byte == '"')
-                return false;
-            if (byte != ' ')
-                temConteudo = true;
-            p++;
-            continue;
-        }
-
-        int tamanho = tamanhoCaractereUtf8(byte);
-        if (tamanho == 0 || fim - p < tamanho)
+        unsigned char c = (unsigned char)texto[i];
+        if (c == '\0')
+            return temConteudo;
+        if (c < 32 || c == 127 || c == '"')
             return false;
-        // Os bytes de continuação de um caractere acentuado ficam entre 0x80 e 0xBF.
-        for (int i = 1; i < tamanho; i++)
-        {
-            if (p[i] < 0x80 || p[i] > 0xBF)
-                return false;
-        }
-        p += tamanho;
-        temConteudo = true;
+        if (c != ' ')
+            temConteudo = true;
     }
-    return temConteudo;
+    return false; // passou do limite sem encontrar o fim do texto
 }
 
 const char *validarPergunta(const Pergunta *pergunta)
