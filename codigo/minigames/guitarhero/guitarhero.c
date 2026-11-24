@@ -1,7 +1,6 @@
 #include "guitarhero.h"
 #include "desenho.h"
 #include <math.h>
-#include <stddef.h>
 #include <stdlib.h>
 
 #define LARGURA 800
@@ -10,8 +9,8 @@
 #define TRILHAS 4
 #define MAX_NOTAS 256
 #define LARGURA_TRILHA 90
-#define LARGURA_CAMPO (TRILHAS * LARGURA_TRILHA)
-#define INICIO_CAMPO ((LARGURA - LARGURA_CAMPO) / 2)
+#define LARGURA_CAMPO 360
+#define INICIO_CAMPO 220
 #define VELOCIDADE_NOTAS 337.5f
 #define DURACAO_PARTIDA 30
 #define PREPARACAO_MUSICA 1.5f
@@ -72,13 +71,13 @@ typedef struct {
     size_t quantidade;
 } Faixa;
 
-#define TAMANHO_VETOR(vetor) (sizeof(vetor) / sizeof((vetor)[0]))
-
-static const Faixa faixas[] = {
-    {"Hedwig's Theme", "harry-potter.wav", harryPotter, TAMANHO_VETOR(harryPotter)},
-    {"Blue Bird", "blue-bird.wav", blueBird, TAMANHO_VETOR(blueBird)},
-    {"Sweden", "sweden.wav", sweden, TAMANHO_VETOR(sweden)}
+const Faixa faixasGuitarra[] = {
+    {"Hedwig's Theme", "harry-potter.wav", harryPotter, sizeof harryPotter / sizeof harryPotter[0]},
+    {"Blue Bird", "blue-bird.wav", blueBird, sizeof blueBird / sizeof blueBird[0]},
+    {"Sweden", "sweden.wav", sweden, sizeof sweden / sizeof sweden[0]}
 };
+
+const int quantidadeFaixasGuitarra = sizeof faixasGuitarra / sizeof faixasGuitarra[0];
 
 typedef struct {
     NotaMapa mapa;
@@ -86,10 +85,10 @@ typedef struct {
     Precisao precisao;
 } Nota;
 
-typedef struct {
+struct SessaoGuitarra
+{
     Nota notas[MAX_NOTAS];
     float duracao;
-    bool modoBonus;
     int quantidadeNotas;
     int pontos;
     int erros;
@@ -102,229 +101,211 @@ typedef struct {
     float fimMensagem;
     Color coresPulso[TRILHAS];
     float finsPulso[TRILHAS];
-} Partida;
+    Sound somFaixa;
+    float tempo;
+    float esperaSaidaAudio;
+    bool treino;
+    ResultadoMinigame resultado;
+};
 
-static const int teclas[TRILHAS] = {KEY_D, KEY_F, KEY_J, KEY_K};
-static const char *const nomesTeclas[TRILHAS] = {"D", "F", "J", "K"};
-static const Color coresTrilhas[TRILHAS] = {GREEN, RED, YELLOW, BLUE};
-static const NivelPrecisao niveis[NIVEIS_PRECISAO] = {
+const int teclasGuitarra[TRILHAS] = {KEY_D, KEY_F, KEY_J, KEY_K};
+const char *const nomesTeclasGuitarra[TRILHAS] = {"D", "F", "J", "K"};
+const Color coresTrilhasGuitarra[TRILHAS] = {GREEN, RED, YELLOW, BLUE};
+const NivelPrecisao niveisGuitarra[NIVEIS_PRECISAO] = {
     {100, "Perfeito!", GREEN},
     {75, "Ótimo!", SKYBLUE},
     {50, "Bom!", GOLD}
 };
 
 #ifdef GUITARHERO_INDEPENDENTE
-static bool Botao(Rectangle area, const char *texto)
+bool botaoGuitarra(Rectangle area, const char *texto)
 {
-    const int tamanho = 24;
     bool sobreBotao = CheckCollisionPointRec(GetMousePosition(), area);
-    Color cor = sobreBotao ? DARKGRAY : (Color){30, 30, 45, 255};
-    DrawRectangleRec(area, cor);
-    textoNoRetangulo(texto, area, tamanho, WHITE);
-
+    DrawRectangleRec(area, sobreBotao ? DARKGRAY : (Color){30, 30, 45, 255});
+    textoNoRetangulo(texto, area, 24, WHITE);
     return sobreBotao && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
-
 #endif
 
-static void IniciarTreino(Partida *partida)
+void prepararTreinoGuitarra(SessaoGuitarra *partida)
 {
-    *partida = (Partida){.multiplicador = 1, .duracao = DURACAO_PARTIDA};
-    float livreEm[TRILHAS] = {0};
-    const float janela = JANELA_ACERTO;
-
-    // Os tempos indicam quando a cabeça e a cauda chegam à linha de acerto.
+    partida->duracao = DURACAO_PARTIDA;
+    int trilhaBloqueada = -1;
     for (int i = 0; i < MAX_NOTAS; i++)
     {
         float inicio = 2.3f + i * INTERVALO_NOTAS;
         float duracao = (i + 1) % 5 == 0 ? DURACAO_SUSTENTADA : 0.0f;
-        float fim = inicio + fmaxf(janela, duracao);
-        if (fim >= DURACAO_PARTIDA)
+        if (inicio + fmaxf(JANELA_ACERTO, duracao) >= DURACAO_PARTIDA)
             break;
 
-        // A cauda de uma nota pode avançar sobre o intervalo da próxima.
+        // Uma nota sustentada bloqueia sua trilha para a nota seguinte.
         int disponiveis[TRILHAS];
         int quantidade = 0;
         for (int t = 0; t < TRILHAS; t++)
-        {
-            if (inicio - janela > livreEm[t])
+            if (t != trilhaBloqueada)
                 disponiveis[quantidade++] = t;
-        }
 
-        // Há apenas uma nota sustentada a cada cinco no treino.
         int trilha = disponiveis[GetRandomValue(0, quantidade - 1)];
-        livreEm[trilha] = fim;
-        partida->notas[partida->quantidadeNotas++] = (Nota){
-            .mapa = {inicio, duracao, trilha}
-        };
+        partida->notas[partida->quantidadeNotas++].mapa = (NotaMapa){inicio, duracao, trilha};
+        trilhaBloqueada = duracao > 0 ? trilha : -1;
     }
 }
 
-static Sound CarregarFaixa(const Faixa *faixa, Partida *partida)
+Sound carregarFaixaGuitarra(const Faixa *faixa, SessaoGuitarra *partida)
 {
     Wave onda = LoadWave(TextFormat("%sguitarhero-musicas/%s", GetApplicationDirectory(), faixa->arquivo));
     if (!IsWaveValid(onda))
         return (Sound){0};
 
     float duracao = (float)onda.frameCount / onda.sampleRate;
-    if (faixa->quantidade > MAX_NOTAS || duracao <= 0.0f || duracao > 60.0f)
-    {
-        UnloadWave(onda);
-        return (Sound){0};
-    }
-
     // Os WAVs são curtos. O arquivo é lido inteiro antes da contagem inicial.
-    Sound som = LoadSoundFromWave(onda);
+    Sound som = {0};
+    if (duracao > 0 && duracao <= 60 && faixa->quantidade <= MAX_NOTAS && faixa->mapa[0].inicio < duracao)
+        som = LoadSoundFromWave(onda);
     UnloadWave(onda);
     if (!IsSoundValid(som))
-        return (Sound){0};
+        return som;
 
-    *partida = (Partida){.multiplicador = 1, .duracao = duracao, .modoBonus = true};
-    for (size_t i = 0; i < faixa->quantidade; i++)
+    partida->duracao = duracao;
+    for (size_t i = 0; i < faixa->quantidade && faixa->mapa[i].inicio < duracao; i++)
     {
         NotaMapa nota = faixa->mapa[i];
-        if (nota.inicio >= duracao)
-            break;
         nota.duracao = fminf(nota.duracao, duracao - nota.inicio);
         partida->notas[partida->quantidadeNotas++].mapa = nota;
-    }
-    if (partida->quantidadeNotas == 0)
-    {
-        UnloadSound(som);
-        return (Sound){0};
     }
     SetSoundVolume(som, 0.65f);
     return som;
 }
 
-static void MostrarFeedback(Partida *partida, int trilha, float tempo, const char *texto, Color cor)
+void julgarNotaGuitarra(SessaoGuitarra *partida, Nota *nota, float tempo, const char *erro)
 {
-    partida->mensagem = texto;
+    int trilha = nota->mapa.trilha;
+    const char *mensagem;
+    Color cor;
+    if (erro)
+    {
+        nota->estado = RESOLVIDA;
+        partida->erros++;
+        partida->combo = 0;
+        partida->multiplicador = 1;
+        mensagem = erro;
+        cor = RED;
+    }
+    else if (nota->estado == PENDENTE && nota->mapa.duracao > 0)
+    {
+        nota->estado = SUSTENTANDO;
+        mensagem = "Segure!";
+        cor = coresTrilhasGuitarra[trilha];
+    }
+    else
+    {
+        const NivelPrecisao *nivel = &niveisGuitarra[nota->precisao];
+        nota->estado = RESOLVIDA;
+        partida->acertos[nota->precisao]++;
+        partida->combo++;
+        if (partida->combo > partida->maiorCombo)
+            partida->maiorCombo = partida->combo;
+        partida->multiplicador = 1 + partida->combo / ACERTOS_POR_NIVEL;
+        if (partida->multiplicador > MULTIPLICADOR_MAXIMO)
+            partida->multiplicador = MULTIPLICADOR_MAXIMO;
+        partida->pontos += nivel->pontos * partida->multiplicador;
+        mensagem = nivel->mensagem;
+        cor = nivel->cor;
+    }
+    partida->mensagem = mensagem;
     partida->corMensagem = cor;
     partida->fimMensagem = tempo + DURACAO_MENSAGEM;
     partida->coresPulso[trilha] = cor;
     partida->finsPulso[trilha] = tempo + DURACAO_PULSO;
 }
 
-static Precisao AvaliarPrecisao(float diferenca)
+const char *textoErrosGuitarra(const SessaoGuitarra *partida)
 {
-    if (diferenca <= JANELA_PERFEITO)
-        return PERFEITO;
-    if (diferenca <= JANELA_OTIMO)
-        return OTIMO;
-    return BOM;
-}
-
-static void RegistrarAcerto(Partida *partida, Nota *nota, float tempo)
-{
-    NivelPrecisao nivel = niveis[nota->precisao];
-    nota->estado = RESOLVIDA;
-    partida->acertos[nota->precisao]++;
-    partida->combo++;
-    if (partida->combo > partida->maiorCombo)
-        partida->maiorCombo = partida->combo;
-
-    int multiplicador = 1 + partida->combo / ACERTOS_POR_NIVEL;
-    partida->multiplicador = multiplicador > MULTIPLICADOR_MAXIMO ? MULTIPLICADOR_MAXIMO : multiplicador;
-    partida->pontos += nivel.pontos * partida->multiplicador;
-    MostrarFeedback(partida, nota->mapa.trilha, tempo, nivel.mensagem, nivel.cor);
-}
-
-static void RegistrarErro(Partida *partida, Nota *nota, float tempo, const char *texto)
-{
-    nota->estado = RESOLVIDA;
-    partida->erros++;
-    partida->combo = 0;
-    partida->multiplicador = 1;
-    MostrarFeedback(partida, nota->mapa.trilha, tempo, texto, RED);
-}
-
-static bool EsgotouErros(const Partida *partida)
-{
-    return !partida->modoBonus && partida->erros >= MAX_ERROS;
-}
-
-static const char *TextoErros(const Partida *partida)
-{
-    return partida->modoBonus
+    return IsSoundValid(partida->somFaixa)
         ? TextFormat("Erros: %d", partida->erros)
         : TextFormat("Erros: %d/%d", partida->erros, MAX_ERROS);
 }
 
-static void AtualizarPartida(Partida *partida, float tempo)
+void atualizarNotasGuitarra(SessaoGuitarra *partida)
 {
+    float tempo = partida->tempo;
+    bool temFaixa = IsSoundValid(partida->somFaixa);
+    bool apertou[TRILHAS];
+    Nota *maisProxima[TRILHAS] = {NULL};
+    float menorDiferenca[TRILHAS] = {0};
+    for (int t = 0; t < TRILHAS; t++)
+        apertou[t] = IsKeyPressed(teclasGuitarra[t]);
+
     for (int i = 0; i < partida->quantidadeNotas; i++)
     {
         Nota *nota = &partida->notas[i];
+        int trilha = nota->mapa.trilha;
+        float atraso = tempo - nota->mapa.inicio;
         if (nota->estado == SUSTENTANDO)
         {
             float fim = nota->mapa.inicio + nota->mapa.duracao;
-            float toleranciaCedo = fminf(TOLERANCIA_SOLTURA, nota->mapa.duracao * 0.4f);
-
             if (tempo > fim + TOLERANCIA_SOLTURA)
-                RegistrarErro(partida, nota, tempo, "Soltou tarde!");
-            else if (!IsKeyDown(teclas[nota->mapa.trilha]) || tempo >= partida->duracao)
+                julgarNotaGuitarra(partida, nota, tempo, "Soltou tarde!");
+            else if (!IsKeyDown(teclasGuitarra[trilha]) || tempo >= partida->duracao)
             {
-                if (tempo < fim - toleranciaCedo)
-                    RegistrarErro(partida, nota, tempo, "Soltou cedo!");
-                else
-                    RegistrarAcerto(partida, nota, tempo);
+                float tolerancia = fminf(TOLERANCIA_SOLTURA, nota->mapa.duracao * 0.4f);
+                julgarNotaGuitarra(partida, nota, tempo,
+                    tempo < fim - tolerancia ? "Soltou cedo!" : NULL);
             }
         }
-        else if (nota->estado == PENDENTE && tempo - nota->mapa.inicio > JANELA_ACERTO)
+        else if (nota->estado == PENDENTE)
         {
-            RegistrarErro(partida, nota, tempo, "Nota perdida!");
+            if (atraso > JANELA_ACERTO)
+                julgarNotaGuitarra(partida, nota, tempo, "Nota perdida!");
+            else if (apertou[trilha] && atraso >= -JANELA_ACERTO)
+            {
+                float diferenca = fabsf(atraso);
+                if (!maisProxima[trilha] || diferenca <= menorDiferenca[trilha])
+                {
+                    maisProxima[trilha] = nota;
+                    menorDiferenca[trilha] = diferenca;
+                }
+            }
         }
 
-        if (EsgotouErros(partida))
+        if (!temFaixa && partida->erros >= MAX_ERROS)
             return;
     }
 
+    // As teclas só pontuam depois de julgar as notas perdidas e as caudas.
     for (int t = 0; t < TRILHAS; t++)
     {
-        if (!IsKeyPressed(teclas[t]))
+        Nota *nota = maisProxima[t];
+        if (!nota)
             continue;
 
-        Nota *melhorNota = NULL;
-        float menorDiferenca = JANELA_ACERTO;
-        for (int i = 0; i < partida->quantidadeNotas; i++)
-        {
-            Nota *nota = &partida->notas[i];
-            if (nota->estado != PENDENTE || nota->mapa.trilha != t)
-                continue;
-
-            float diferenca = fabsf(tempo - nota->mapa.inicio);
-            if (diferenca <= menorDiferenca)
-            {
-                menorDiferenca = diferenca;
-                melhorNota = nota;
-            }
-        }
-
-        if (melhorNota == NULL)
-            continue;
-
-        melhorNota->precisao = AvaliarPrecisao(menorDiferenca);
-        if (melhorNota->mapa.duracao > 0.0f)
-        {
-            melhorNota->estado = SUSTENTANDO;
-            MostrarFeedback(partida, t, tempo, "Segure!", coresTrilhas[t]);
-        }
-        else
-        {
-            RegistrarAcerto(partida, melhorNota, tempo);
-        }
+        nota->precisao = BOM;
+        if (menorDiferenca[t] <= JANELA_PERFEITO)
+            nota->precisao = PERFEITO;
+        else if (menorDiferenca[t] <= JANELA_OTIMO)
+            nota->precisao = OTIMO;
+        julgarNotaGuitarra(partida, nota, tempo, NULL);
     }
 }
 
-static void DesenharPartida(const Partida *partida, float tempo, bool finalizando)
+int totalAcertosGuitarra(const SessaoGuitarra *partida)
 {
+    int total = 0;
+    for (int i = 0; i < NIVEIS_PRECISAO; i++)
+        total += partida->acertos[i];
+    return total;
+}
+
+void DesenharGuitarra(const SessaoGuitarra *partida)
+{
+    float tempo = partida->tempo;
+    ClearBackground(BLACK);
+    DrawRectangle(INICIO_CAMPO, 0, LARGURA_CAMPO, ALTURA, (Color){30, 30, 45, 255});
     for (int t = 0; t < TRILHAS; t++)
     {
         int x = INICIO_CAMPO + t * LARGURA_TRILHA;
-        DrawRectangle(x, 0, LARGURA_TRILHA, ALTURA, (Color){30, 30, 45, 255});
-        if (IsKeyDown(teclas[t]))
-            DrawRectangleGradientV(x, 0, LARGURA_TRILHA, ALTURA, BLANK, Fade(coresTrilhas[t], 0.35f));
+        if (IsKeyDown(teclasGuitarra[t]))
+            DrawRectangleGradientV(x, 0, LARGURA_TRILHA, ALTURA, BLANK, Fade(coresTrilhasGuitarra[t], 0.35f));
         DrawLine(x, 0, x, ALTURA, DARKGRAY);
     }
     DrawLine(INICIO_CAMPO + LARGURA_CAMPO, 0, INICIO_CAMPO + LARGURA_CAMPO, ALTURA, DARKGRAY);
@@ -333,8 +314,8 @@ static void DesenharPartida(const Partida *partida, float tempo, bool finalizand
     for (int t = 0; t < TRILHAS; t++)
     {
         int centroX = INICIO_CAMPO + t * LARGURA_TRILHA + LARGURA_TRILHA / 2;
-        Color cor = coresTrilhas[t];
-        if (IsKeyDown(teclas[t]))
+        Color cor = coresTrilhasGuitarra[t];
+        if (IsKeyDown(teclasGuitarra[t]))
             DrawCircle(centroX, LINHA_ACERTO, 28, cor);
         else
             DrawCircleLines(centroX, LINHA_ACERTO, 28, cor);
@@ -342,11 +323,11 @@ static void DesenharPartida(const Partida *partida, float tempo, bool finalizand
         float pulso = (partida->finsPulso[t] - tempo) / DURACAO_PULSO;
         if (partida->finsPulso[t] > 0.0f && pulso > 0.0f)
         {
-            Vector2 centro = {centroX, LINHA_ACERTO};
             float raio = 28.0f + (1.0f - pulso) * 15.0f;
-            DrawRing(centro, raio, raio + 4.0f, 0, 360, 36, Fade(partida->coresPulso[t], pulso));
+            DrawRing((Vector2){centroX, LINHA_ACERTO}, raio, raio + 4.0f,
+                0, 360, 36, Fade(partida->coresPulso[t], pulso));
         }
-        DrawText(nomesTeclas[t], centroX - 8, LINHA_ACERTO + 45, 24, cor);
+        DrawText(nomesTeclasGuitarra[t], centroX - 8, LINHA_ACERTO + 45, 24, cor);
     }
 
     // Começa pelas notas mais distantes para que a próxima fique por cima.
@@ -361,7 +342,7 @@ static void DesenharPartida(const Partida *partida, float tempo, bool finalizand
             continue;
 
         int centroX = INICIO_CAMPO + nota->mapa.trilha * LARGURA_TRILHA + LARGURA_TRILHA / 2;
-        Color cor = coresTrilhas[nota->mapa.trilha];
+        Color cor = coresTrilhasGuitarra[nota->mapa.trilha];
         if (nota->mapa.duracao > 0.0f)
         {
             float yCauda = y - nota->mapa.duracao * VELOCIDADE_NOTAS;
@@ -382,24 +363,28 @@ static void DesenharPartida(const Partida *partida, float tempo, bool finalizand
         DrawCircleLines(centroX, (int)y, RAIO_NOTA, WHITE);
     }
 
-    DrawText(TextoErros(partida), 16, 16, 20, WHITE);
+    DrawText(textoErrosGuitarra(partida), 16, 16, 20, WHITE);
     DrawText(TextFormat("Pontos: %d", partida->pontos), 16, 44, 20, WHITE);
     DrawText(TextFormat("Combo: %d (x%d)", partida->combo, partida->multiplicador), 16, 72, 20, WHITE);
     int segundosRestantes = (int)ceilf(partida->duracao - fmaxf(0.0f, tempo));
     DrawText(TextFormat("Tempo: %d s", segundosRestantes), 16, 100, 20, WHITE);
-    if (finalizando)
+    if (partida->esperaSaidaAudio > 0.0f)
         textoCentralizado("Finalizando faixa...", 560, 24, RAYWHITE);
     else if (tempo < 0.0f)
         textoCentralizado("Prepare-se!", 560, 24, RAYWHITE);
     else if (tempo < partida->fimMensagem)
         textoCentralizado(partida->mensagem, 560, 24, partida->corMensagem);
+    if (!partida->treino)
+        DrawText(TextFormat("Notas acertadas: %d/%d", totalAcertosGuitarra(partida), partida->quantidadeNotas),
+            16, 129, 17, GOLD);
 }
 
 #ifdef GUITARHERO_INDEPENDENTE
-static void DesenharResultado(const Partida *partida)
+void desenharResultadoGuitarra(const SessaoGuitarra *partida)
 {
-    bool perdeu = EsgotouErros(partida);
-    const char *titulo = partida->modoBonus ? "Faixa concluída!" : (perdeu ? "Você perdeu!" : "Você venceu!");
+    bool temFaixa = IsSoundValid(partida->somFaixa);
+    bool perdeu = !temFaixa && partida->erros >= MAX_ERROS;
+    const char *titulo = temFaixa ? "Faixa concluída!" : (perdeu ? "Você perdeu!" : "Você venceu!");
     textoCentralizado(titulo, 94, 48, perdeu ? RED : GREEN);
     if (perdeu)
         textoCentralizado(partida->mensagem, 153, 22, partida->corMensagem);
@@ -409,37 +394,25 @@ static void DesenharResultado(const Partida *partida)
     for (int i = 0; i < NIVEIS_PRECISAO; i++)
     {
         julgadas += partida->acertos[i];
-        pontosBase += partida->acertos[i] * niveis[i].pontos;
+        pontosBase += partida->acertos[i] * niveisGuitarra[i].pontos;
     }
-    float precisao = julgadas > 0 ? 100.0f * pontosBase / (julgadas * niveis[PERFEITO].pontos) : 0.0f;
+    float precisao = julgadas > 0 ? (float)pontosBase / julgadas : 0.0f;
     textoCentralizado(TextFormat("Pontuação final: %d", partida->pontos), 204, 28, WHITE);
     textoCentralizado(TextFormat("Precisão: %.1f%%", precisao), 244, 24, WHITE);
     textoCentralizado(TextFormat("Maior combo: %d", partida->maiorCombo), 281, 24, WHITE);
     textoCentralizado(TextFormat("Perfeitos: %d   Ótimos: %d   Bons: %d",
         partida->acertos[PERFEITO], partida->acertos[OTIMO], partida->acertos[BOM]), 332, 20, RAYWHITE);
-    textoCentralizado(TextoErros(partida), 363, 20, RAYWHITE);
+    textoCentralizado(textoErrosGuitarra(partida), 363, 20, RAYWHITE);
 }
 
 #endif
-
-struct SessaoGuitarra
-{
-    // A partida guarda as notas e o placar. A sessão também possui o áudio e seu relógio.
-    Partida partida;
-    Sound somFaixa;
-    float tempo;
-    float esperaSaidaAudio;
-    bool tocandoFaixa;
-    bool treino;
-    ResultadoMinigame resultado;
-};
 
 const char *NomeOpcaoGuitarra(bool treino, int opcao)
 {
     if (treino && opcao == 0)
         return "Treino livre";
     int faixa = opcao - (treino ? 1 : 0);
-    return faixa >= 0 && (size_t)faixa < TAMANHO_VETOR(faixas) ? faixas[faixa].nome : NULL;
+    return faixa >= 0 && faixa < quantidadeFaixasGuitarra ? faixasGuitarra[faixa].nome : NULL;
 }
 
 SessaoGuitarra *IniciarGuitarra(bool treino, int opcao)
@@ -451,12 +424,13 @@ SessaoGuitarra *IniciarGuitarra(bool treino, int opcao)
     if (!sessao)
         return NULL;
     sessao->treino = treino;
+    sessao->multiplicador = 1;
     if (treino && opcao == 0)
-        IniciarTreino(&sessao->partida);
+        prepararTreinoGuitarra(sessao);
     else
     {
         if (IsAudioDeviceReady())
-            sessao->somFaixa = CarregarFaixa(&faixas[opcao - (treino ? 1 : 0)], &sessao->partida);
+            sessao->somFaixa = carregarFaixaGuitarra(&faixasGuitarra[opcao - (treino ? 1 : 0)], sessao);
         if (!IsSoundValid(sessao->somFaixa))
         {
             free(sessao);
@@ -467,90 +441,71 @@ SessaoGuitarra *IniciarGuitarra(bool treino, int opcao)
     return sessao;
 }
 
-static int TotalAcertos(const Partida *partida)
+void resolverNotasRestantesGuitarra(SessaoGuitarra *sessao)
 {
-    int total = 0;
-    for (int i = 0; i < NIVEIS_PRECISAO; i++)
-        total += partida->acertos[i];
-    return total;
-}
-
-static void ResolverNotasRestantes(Partida *partida, float tempo)
-{
-    for (int i = 0; i < partida->quantidadeNotas; i++)
+    for (int i = 0; i < sessao->quantidadeNotas; i++)
     {
-        if (partida->notas[i].estado != RESOLVIDA)
-            RegistrarErro(partida, &partida->notas[i], tempo, "Nota perdida!");
+        if (sessao->notas[i].estado != RESOLVIDA)
+            julgarNotaGuitarra(sessao, &sessao->notas[i], sessao->tempo, "Nota perdida!");
     }
 }
 
-static ResultadoMinigame ConcluirGuitarra(SessaoGuitarra *sessao)
+ResultadoMinigame concluirGuitarra(SessaoGuitarra *sessao)
 {
-    const Partida *partida = &sessao->partida;
     bool venceu = sessao->treino ||
-                  (partida->quantidadeNotas > 0 && 100 * TotalAcertos(partida) >= 70 * partida->quantidadeNotas);
+                  (sessao->quantidadeNotas > 0 && 100 * totalAcertosGuitarra(sessao) >= 70 * sessao->quantidadeNotas);
     sessao->resultado = venceu ? MINIGAME_VITORIA : MINIGAME_DERROTA;
     return sessao->resultado;
 }
 
 ResultadoMinigame AtualizarGuitarra(SessaoGuitarra *sessao, float tempoQuadro)
 {
-    Partida *partida = &sessao->partida;
     if (sessao->resultado != MINIGAME_EM_CURSO)
         return sessao->resultado;
     // O atraso de saída é contado em quadros para a janela continuar respondendo.
     if (sessao->esperaSaidaAudio > 0.0f)
     {
         sessao->esperaSaidaAudio -= tempoQuadro;
-        return sessao->esperaSaidaAudio > 0.0f ? MINIGAME_EM_CURSO : ConcluirGuitarra(sessao);
+        return sessao->esperaSaidaAudio > 0.0f ? MINIGAME_EM_CURSO : concluirGuitarra(sessao);
     }
 
     bool temFaixa = IsSoundValid(sessao->somFaixa);
+    bool contando = sessao->tempo < 0;
     sessao->tempo += tempoQuadro;
-    if (temFaixa && !sessao->tocandoFaixa)
+    if (contando)
     {
         if (sessao->tempo < 0.0f)
             return MINIGAME_EM_CURSO;
         // O relógio das notas começa no mesmo quadro que dispara a faixa.
         sessao->tempo = 0.0f;
         PlaySound(sessao->somFaixa);
-        sessao->tocandoFaixa = true;
     }
 
-    sessao->tempo = fminf(sessao->tempo, partida->duracao);
+    sessao->tempo = fminf(sessao->tempo, sessao->duracao);
     if (temFaixa && !IsSoundPlaying(sessao->somFaixa))
     {
         // O dispositivo ainda pode tocar amostras que o mixer já entregou.
-        sessao->tempo = partida->duracao;
-        ResolverNotasRestantes(partida, sessao->tempo);
+        sessao->tempo = sessao->duracao;
+        resolverNotasRestantesGuitarra(sessao);
         sessao->esperaSaidaAudio = MARGEM_SAIDA_AUDIO;
         return MINIGAME_EM_CURSO;
     }
 
-    AtualizarPartida(partida, sessao->tempo);
-    if (EsgotouErros(partida))
+    atualizarNotasGuitarra(sessao);
+    if (!temFaixa && sessao->erros >= MAX_ERROS)
         sessao->resultado = MINIGAME_DERROTA;
-    else if (!temFaixa && sessao->tempo >= partida->duracao)
+    else if (!temFaixa && sessao->tempo >= sessao->duracao)
     {
-        ResolverNotasRestantes(partida, sessao->tempo);
-        return ConcluirGuitarra(sessao);
+        resolverNotasRestantesGuitarra(sessao);
+        return concluirGuitarra(sessao);
     }
     return sessao->resultado;
 }
 
-void DesenharGuitarra(const SessaoGuitarra *sessao)
-{
-    ClearBackground(BLACK);
-    DesenharPartida(&sessao->partida, sessao->tempo, sessao->esperaSaidaAudio > 0.0f);
-    if (!sessao->treino)
-        DrawText(TextFormat("Notas acertadas: %d/%d", TotalAcertos(&sessao->partida),
-                            sessao->partida.quantidadeNotas), 16, 129, 17, GOLD);
-}
-
 PlacarMinigame PlacarGuitarra(const SessaoGuitarra *sessao)
 {
-    return (PlacarMinigame){.pontos = sessao->partida.pontos, .acertos = TotalAcertos(&sessao->partida),
-                           .notas = sessao->partida.quantidadeNotas};
+    return (PlacarMinigame){.pontos = sessao->pontos, .acertos = totalAcertosGuitarra(sessao),
+                           .notas = sessao->quantidadeNotas};
 }
 
 void EncerrarGuitarra(SessaoGuitarra *sessao)
@@ -590,26 +545,26 @@ int main(void)
             textoCentralizado("Guitar Hero", 113, 48, WHITE);
             textoCentralizado(TextFormat("Sobreviva por %d segundos", DURACAO_PARTIDA), 185, 20, WHITE);
             textoCentralizado("D F J K  |  Segure as notas com cauda", 217, 20, LIGHTGRAY);
-            if (Botao((Rectangle){290, 278, 220, 52}, "Jogar"))
+            if (botaoGuitarra((Rectangle){290, 278, 220, 52}, "Jogar"))
                 iniciarOpcao = 0;
-            if (Botao((Rectangle){290, 346, 220, 52}, "Músicas"))
+            if (botaoGuitarra((Rectangle){290, 346, 220, 52}, "Músicas"))
             {
                 tela = TELA_MUSICAS;
                 erroFaixa = NULL;
             }
-            sair = Botao((Rectangle){290, 414, 220, 52}, "Sair");
+            sair = botaoGuitarra((Rectangle){290, 414, 220, 52}, "Sair");
             break;
 
         case TELA_MUSICAS:
             textoCentralizado("Músicas bônus", 48, 48, WHITE);
-            for (size_t i = 0; i < TAMANHO_VETOR(faixas); i++)
+            for (int i = 0; i < quantidadeFaixasGuitarra; i++)
             {
-                if (Botao((Rectangle){222, 140 + 56 * (float)i, 356, 46}, faixas[i].nome))
-                    iniciarOpcao = (int)i + 1;
+                if (botaoGuitarra((Rectangle){222, 140 + 56 * i, 356, 46}, faixasGuitarra[i].nome))
+                    iniciarOpcao = i + 1;
             }
-            if (Botao((Rectangle){290, 326, 220, 50}, "Treino livre"))
+            if (botaoGuitarra((Rectangle){290, 326, 220, 50}, "Treino livre"))
                 iniciarOpcao = 0;
-            if (Botao((Rectangle){290, 396, 220, 50}, "Voltar"))
+            if (botaoGuitarra((Rectangle){290, 396, 220, 50}, "Voltar"))
                 tela = TELA_MENU;
             if (erroFaixa)
                 textoCentralizado(erroFaixa, 530, 20, ORANGE);
@@ -620,8 +575,8 @@ int main(void)
             break;
 
         case TELA_RESULTADO:
-            DesenharResultado(&sessao->partida);
-            if (Botao((Rectangle){280, 438, 240, 52}, "Voltar ao menu"))
+            desenharResultadoGuitarra(sessao);
+            if (botaoGuitarra((Rectangle){280, 438, 240, 52}, "Voltar ao menu"))
             {
                 EncerrarGuitarra(sessao);
                 sessao = NULL;

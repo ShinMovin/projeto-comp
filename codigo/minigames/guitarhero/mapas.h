@@ -4,7 +4,7 @@
 // Notas dos MIDIs alinhadas aos trechos em musicas/.
 // Cada linha traz início, duração sustentada e trilha (D, F, J, K).
 // Recorte da gravação original a partir de 2,65 s.
-static const NotaMapa harryPotter[] = {
+const NotaMapa harryPotter[] = {
     {0.610f, 0.920f, 3},
     {0.955f, 0.886f, 1},
     {1.450f, 0.920f, 2},
@@ -157,7 +157,7 @@ static const NotaMapa harryPotter[] = {
 };
 
 // Trecho da gravação original de 0:07 a 1:07.
-static const NotaMapa blueBird[] = {
+const NotaMapa blueBird[] = {
     {3.875f, 0.890f, 1},
     {4.085f, 0.692f, 0},
     {4.305f, 0.920f, 2},
@@ -299,7 +299,7 @@ static const NotaMapa blueBird[] = {
 };
 
 // Primeiro minuto da gravação original.
-static const NotaMapa sweden[] = {
+const NotaMapa sweden[] = {
     {5.810f, 0.920f, 1},
     {7.180f, 0.920f, 0},
     {8.545f, 0.920f, 3},
