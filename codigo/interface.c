@@ -18,7 +18,7 @@ static void textoCentralizado(const char *texto,
 }
 
 // Desenha um botão
-static void desenharBotao(const char *texto, Rectangle area)
+static bool desenharBotao(const char *texto, Rectangle area)
 {
     Vector2 mouse = GetMousePosition();
 
@@ -36,10 +36,12 @@ static void desenharBotao(const char *texto, Rectangle area)
              area.x + (area.width - largura) / 2,
              area.y + (area.height - 22) / 2,
              22, corTexto);
+
+    return selecionado && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
 // Interface principal
-void desenharMenu(void)
+Tela desenharMenu(void)
 {
     ClearBackground(FUNDO);
 
@@ -70,19 +72,42 @@ void desenharMenu(void)
     textoCentralizado("DESAFIE SEU SABER", 222, 15, CLARO);
 
     // Botões
-    desenharBotao("JOGAR",
-        (Rectangle){250, 330, 300, 40});
+    Tela proximaTela = MENU_PRINCIPAL;
 
-    desenharBotao("MINIGAMES",
-        (Rectangle){250, 384, 300, 40});
+    if (desenharBotao("JOGAR",
+        (Rectangle){250, 330, 300, 40}))
+    {
+        proximaTela = TELA_JOGAR;
+    }
 
-    desenharBotao("COMO JOGAR",
-        (Rectangle){250, 438, 300, 40});
+    if (desenharBotao("TESTAR MINIGAMES",
+        (Rectangle){250, 384, 300, 40}))
+    {
+        proximaTela = TELA_MINIGAMES;
+    }
 
-    desenharBotao("SAIR",
-        (Rectangle){250, 492, 300, 40});
+    if (desenharBotao("COMO JOGAR",
+        (Rectangle){250, 438, 300, 40}))
+    {
+        proximaTela = TELA_INSTRUCOES;
+    }
 
-    // Rodapé
-    textoCentralizado("ENGENHARIA DE COMPUTACAO - UTFPR",
-                      557, 12, GRAY);
+    if (desenharBotao("SAIR",
+        (Rectangle){250, 492, 300, 40}))
+    {
+        proximaTela = TELA_SAIR;
+    }
+
+    textoCentralizado(
+        "ENGENHARIA DE COMPUTACAO - UTFPR",
+        557, 12, GRAY
+    );
+
+    return proximaTela;
+}
+
+bool desenharVoltar(void)
+{
+    return desenharBotao("VOLTAR",
+        (Rectangle){250, 500, 300, 40});
 }
