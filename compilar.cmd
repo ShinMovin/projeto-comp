@@ -13,7 +13,7 @@ set "PATH=%ucrt%;%msys%;%PATH%"
 set "shell_msys=%msys:\=/%/sh.exe"
 pushd "%~dp0" || exit /b 1
 
-"%ucrt%\mingw32-make.exe" -C codigo "SHELL=%shell_msys%" "CFLAGS=-Wall -Wextra -Werror"
+"%ucrt%\mingw32-make.exe" "SHELL=%shell_msys%" "CFLAGS=-Wall -Wextra -Werror"
 set "status=%ERRORLEVEL%"
 if not "%status%"=="0" goto fim
 if /i not "%~1"=="jogar" goto fim

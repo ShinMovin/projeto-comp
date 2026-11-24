@@ -36,7 +36,7 @@ Para abrir o gerenciamento pelo terminal, execute `./compilado/jogo --banco`.
 ### Recursos e banco de perguntas
 
 - O jogo carrega `dados/perguntas.dat` e usa `dados/perguntas.csv` como alternativa. O DAT legado depende do formato binário de `int`, `enum` e `Pergunta` utilizado pelo compilador. O CSV utiliza UTF-8 e aceita quebras LF ou CRLF.
-- Os alvos opcionais `guitarhero`, `tiroalvo` e `travessia` compilam os minigames independentes. O Makefile copia os áudios para `compilado/guitarhero-musicas/` e `compilado/audio-tiroalvo/`. No Linux, execute `make -C codigo guitarhero tiroalvo travessia` a partir da raiz.
+- Os alvos opcionais `guitarhero`, `tiroalvo` e `travessia` compilam os minigames independentes. O Makefile copia os áudios para `compilado/guitarhero-musicas/` e `compilado/audio-tiroalvo/`. No Linux, execute `make guitarhero tiroalvo travessia` a partir da raiz.
 
 ## Partida
 

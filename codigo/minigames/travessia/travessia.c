@@ -558,7 +558,7 @@ void EncerrarTravessia(SessaoTravessia *sessao)
 }
 
 #ifdef TRAVESSIA_INDEPENDENTE
-// Permite testar só o minigame: make -C codigo run-travessia
+// Para testar só o minigame, execute make run-travessia na raiz.
 int main(void)
 {
     InitWindow(LARGURA, ALTURA, "Travessia");
