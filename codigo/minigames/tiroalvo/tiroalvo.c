@@ -162,27 +162,27 @@ static void DesenharPainelMenu(void)
 Alvo CriarAlvo(int raridade, TipoAlvo tipo, const Rectangle janelas[])
 {
     Alvo alvo = {{0, 0}, 0.0f, tipo.duracao, tipo.pausa};
+    int posicao = raridade == FALSO ? GetRandomValue(COMUM, FALSO) : raridade;
 
-    if (raridade == COMUM)
+    if (posicao == COMUM)
     {
         alvo.centro = (Vector2){GetRandomValue(140, 660), TRILHA_COMUM_Y};
     }
-    else if (raridade == RARO)
+    else if (posicao == RARO)
     {
         alvo.centro = (Vector2){GetRandomValue(375, 425), TRILHA_RARA_Y};
         alvo.velocidadeX = VELOCIDADE_RARO;
         if (GetRandomValue(0, 1) == 0)
             alvo.velocidadeX = -VELOCIDADE_RARO;
     }
-    else if (raridade == EPICO)
+    else if (posicao == EPICO)
     {
         Rectangle janela = janelas[GetRandomValue(0, 1)];
         alvo.centro.x = janela.x + janela.width / 2;
         alvo.centro.y = janela.y + janela.height / 2;
     }
-    else if (raridade == FALSO)
+    else if (posicao == FALSO)
     {
-        // O alvo falso fica fora do percurso do alvo azul.
         alvo.centro = (Vector2){GetRandomValue(0, 1) == 0 ? 135 : 665, TRILHA_RARA_Y};
     }
     else
@@ -195,6 +195,9 @@ Alvo CriarAlvo(int raridade, TipoAlvo tipo, const Rectangle janelas[])
             alvo.velocidadeX = -VELOCIDADE_LENDARIO;
         }
     }
+
+    if (raridade == FALSO)
+        alvo.velocidadeX = 0.0f;
 
     return alvo;
 }
@@ -389,8 +392,7 @@ int main(void)
                     alvo.tempoVisivel -= dt;
 
                     // O clique usa a posição mostrada no quadro anterior.
-                    if (alvo.tempoVisivel > 0.0f && clicou &&
-                        CheckCollisionPointCircle(mouse, alvo.centro, tipo.raio))
+                    if (clicou && CheckCollisionPointCircle(mouse, alvo.centro, tipo.raio))
                     {
                         pontos += tipo.pontos;
                         if (temSomAcerto && raridade != FALSO)
@@ -428,7 +430,13 @@ int main(void)
                 }
 
                 alvos[raridade] = alvo;
+            }
 
+            // A ordem visual acompanha a prioridade do clique quando alvos se sobrepõem.
+            for (int raridade = COMUM; raridade <= FALSO; raridade++)
+            {
+                Alvo alvo = alvos[raridade];
+                TipoAlvo tipo = tipos[raridade];
                 if (alvo.tempoVisivel > 0.0f)
                 {
                     DrawCircleV(alvo.centro, tipo.raio, tipo.cor);
