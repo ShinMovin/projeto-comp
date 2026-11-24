@@ -3,3 +3,4 @@
 a.out
 compilado/
 dados/perguntas_exportadas.csv
+dados/.banco-*

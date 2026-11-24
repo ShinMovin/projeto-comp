@@ -10,22 +10,26 @@
  */
 #include "premio.h"
 
-int dificuldadeBase[15] = {1,1, 2,2, 3,3,3,3,3, 4,4,4,4, 5,5};
-int premioDificuldade[6] = {0, 5000, 10000, 50000, 100000, 300000};
+static const int valoresRodadas[TOTAL_RODADAS] = {
+    1000, 2000, 5000,
+    10000, 15000, 20000,
+    30000, 40000, 50000,
+    75000, 100000, 200000,
+    300000, 500000, 1000000
+};
 
-int valorPergunta(int difBase, int difFinal)
+Dificuldade dificuldadeRodada(int rodada)
 {
-    if(difBase >= difFinal)
-    {
-        return premioDificuldade[difBase];
-    }
-    else
-    {
-        return premioDificuldade[difFinal];
-    }
+    return (Dificuldade)(MUITO_FACIL + rodada / RODADAS_POR_NIVEL);
 }
 
-int dificuldadeRodada(int rodada)
+int valorRodada(int rodada)
 {
-    return dificuldadeBase[rodada];
+    return rodada >= 0 && rodada < TOTAL_RODADAS ? valoresRodadas[rodada] : 0;
+}
+
+bool rodadaTemCheckpoint(int rodada)
+{
+    return rodada >= 0 && rodada < TOTAL_RODADAS - 1 &&
+           (rodada + 1) % RODADAS_POR_NIVEL == 0;
 }

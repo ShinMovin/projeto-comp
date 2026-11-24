@@ -12,19 +12,19 @@
 #define PREMIO_H
 #include "perguntas.h"
 
-/**
- * @brief Valor de uma pergunta, usando a maior entre as duas dificuldades.
- * @param difBase dificuldade da rodada
- * @param difFinal dificuldade depois da roleta
- * @return valor em reais
- */
-int valorPergunta(int difBase, int difFinal);
+enum { RODADAS_POR_NIVEL = 3, TOTAL_RODADAS = RODADAS_POR_NIVEL * IMPOSSIVEL };
 
 /**
  * @brief Dificuldade base de uma rodada.
  * @param rodada rodada de 0 a 14
  * @return dificuldade de 1 a 5
  */
-int dificuldadeRodada(int rodada);
+Dificuldade dificuldadeRodada(int rodada);
+
+/** @brief Valor da pergunta na rodada indicada, numerada de 0 a 14. */
+int valorRodada(int rodada);
+
+/** @brief Indica se concluir esta rodada (índice de 0 a 14) garante um prêmio. */
+bool rodadaTemCheckpoint(int rodada);
 
 #endif

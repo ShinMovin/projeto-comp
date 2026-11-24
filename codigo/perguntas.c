@@ -9,897 +9,573 @@
  * 
  */
 #include "perguntas.h"
+#include <ctype.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
-#include <ctype.h>
 
-//cria o banco vazio, alocando os vetores com a capacidade inicial
-int inicializaBanco(BancoPerguntas *banco){
-    (*banco).quantidade = 0;
-    (*banco).capacidade = 5;
-    (*banco).perguntas = calloc(5, sizeof(Pergunta));
-    (*banco).usadas = calloc(5, sizeof(bool)); //bool serve para armazenar apenas 0 e 1 (falso/verdadeiro)
+enum { CAPACIDADE_INICIAL = 5 };
 
-    //testando se deu erro de alocação
-    if((*banco).perguntas == NULL || (*banco).usadas == NULL){
-        //liberando memória 
-        free((*banco).perguntas);
-        free((*banco).usadas);
-        //limpando ponteiro
-        ((*banco).perguntas) = NULL;
-        ((*banco).usadas) = NULL;
-
-        return 0; //se deu erro retorna 0
-    }
-
-    return 1; //indica que deu certo
-}
-
-//libera a memoria do banco
-void liberaBancoPergunta(BancoPerguntas *banco){
-    //liberando memória
-    free((*banco).perguntas);
-    free((*banco).usadas);
-    //limpando ponteiro
-    (*banco).perguntas = NULL;
-    (*banco).usadas = NULL;
-    (*banco).quantidade = 0;
-    (*banco).capacidade = 0;
-}
-
-//le um campo do texto a partir da posicao
-int lerString(const char *texto, int *posicao, char *destino)
+static bool redimensionarBanco(BancoPerguntas *banco, int capacidade)
 {
-    int i = *posicao;
-    int j = 0;
+    if (capacidade < banco->quantidade || (size_t)capacidade > SIZE_MAX / sizeof(Pergunta))
+        return false;
 
-    if(texto[i] == '"')
+    // Troca os dois vetores juntos. Em caso de falha, os originais continuam válidos.
+    Pergunta *perguntas = malloc((size_t)capacidade * sizeof *perguntas);
+    bool *usadas = calloc((size_t)capacidade, sizeof *usadas);
+    if (!perguntas || !usadas)
     {
-        i++;
-        while(texto[i] != '"')
+        free(perguntas);
+        free(usadas);
+        return false;
+    }
+    if (banco->quantidade > 0)
+    {
+        memcpy(perguntas, banco->perguntas, (size_t)banco->quantidade * sizeof *perguntas);
+        memcpy(usadas, banco->usadas, (size_t)banco->quantidade * sizeof *usadas);
+    }
+    free(banco->perguntas);
+    free(banco->usadas);
+    banco->perguntas = perguntas;
+    banco->usadas = usadas;
+    banco->capacidade = capacidade;
+    return true;
+}
+
+int inicializaBanco(BancoPerguntas *banco)
+{
+    *banco = (BancoPerguntas){0};
+    return redimensionarBanco(banco, CAPACIDADE_INICIAL);
+}
+
+void liberaBancoPergunta(BancoPerguntas *banco)
+{
+    free(banco->perguntas);
+    free(banco->usadas);
+    *banco = (BancoPerguntas){0};
+}
+
+static bool textoValido(const char *texto)
+{
+    const unsigned char *p = (const unsigned char *)texto;
+    const unsigned char *fim = memchr(p, '\0', LIMITE_TEXTO_PERGUNTA + 1);
+    if (!fim)
+        return false;
+
+    bool temConteudo = false;
+    while (p < fim)
+    {
+        unsigned char byte = *p++;
+        if (byte < 0x80)
         {
-            if(texto[i] == '\n' || texto[i] == '\0' || texto[i] == '\r')
-            {
-                printf("Erro : aspas sem fechar !\n");
-                return 0;
-            }
-            if(j == 200)
-            {
-                printf("Erro : texto muito longo !\n");
-                return 0;
-            }
-            destino[j] = texto[i];
-            i++;
-            j++;
+            if (byte < 32 || byte == 127 || byte == '"')
+                return false;
+            temConteudo |= byte != ' ';
+            continue;
         }
 
-        i++;
-    }
-    else
-    {
-        while (texto[i] != '\n' && texto[i] != '\0' && texto[i] != ',' && texto[i] != '\r' && j < 200)
+        // Valida as sequências UTF-8 sem ler além do campo.
+        int restantes = byte >= 0xF0 ? 3 : byte >= 0xE0 ? 2 : 1;
+        if (byte < 0xC2 || byte > 0xF4 || fim - p < restantes)
+            return false;
+        unsigned int ponto = byte & (0x7Fu >> (restantes + 1));
+        const unsigned int minimo[] = {0, 0x80, 0x800, 0x10000};
+        int extras = restantes;
+        while (extras-- > 0)
         {
-            destino[j] = texto[i];
-            i++;
-            j++;
+            unsigned char parte = *p++;
+            if ((parte & 0xC0) != 0x80)
+                return false;
+            ponto = (ponto << 6) | (parte & 0x3F);
         }
+        if (ponto < minimo[restantes] || ponto > 0x10FFFF || (ponto >= 0xD800 && ponto <= 0xDFFF))
+            return false;
+        temConteudo = true;
     }
+    return temConteudo;
+}
 
-    destino[j] = '\0';
-
-    if(j== 0)
+const char *validarPergunta(const Pergunta *pergunta)
+{
+    if (!textoValido(pergunta->conteudo_da_pergunta))
+        return "Enunciado inválido. Use até 200 bytes, sem aspas ou quebras.";
+    for (int i = 0; i < 4; i++)
     {
-        printf("Erro : campo vazio !\n");
-        return 0;
+        if (!textoValido(pergunta->alternativas[i]))
+            return "Preencha as quatro alternativas com até 200 bytes, sem aspas ou quebras.";
     }
-    if(texto[i] != ',')
-    {
-        printf("Erro : campo mal formado / muito longo\n");
-        return 0;
-    }
+    if (pergunta->alternativa_correta < 'A' || pergunta->alternativa_correta > 'D')
+        return "Escolha o gabarito de A a D.";
+    if (pergunta->categorias < GEEK || pergunta->categorias > BIOLOGIA)
+        return "Escolha uma categoria de 1 a 5.";
+    if (pergunta->dificuldades < MUITO_FACIL || pergunta->dificuldades > IMPOSSIVEL)
+        return "Escolha uma dificuldade de 1 a 5.";
+    return NULL;
+}
 
-    *posicao = i;
+bool perguntasIguais(const Pergunta *a, const Pergunta *b)
+{
+    if (a->alternativa_correta != b->alternativa_correta || a->dificuldades != b->dificuldades ||
+        a->categorias != b->categorias || strcmp(a->conteudo_da_pergunta, b->conteudo_da_pergunta) != 0)
+        return false;
+    for (int i = 0; i < 4; i++)
+    {
+        if (strcmp(a->alternativas[i], b->alternativas[i]) != 0)
+            return false;
+    }
+    return true;
+}
+
+bool perguntaContem(const Pergunta *pergunta, const char *trecho)
+{
+    return strstr(pergunta->conteudo_da_pergunta, trecho) != NULL;
+}
+
+static bool enunciadoJaContado(const BancoPerguntas *banco, int indice, bool apenasUsadas)
+{
+    const Pergunta *pergunta = &banco->perguntas[indice];
+    int limite = apenasUsadas ? banco->quantidade : indice;
+    for (int i = 0; i < limite; i++)
+    {
+        if ((apenasUsadas ? banco->usadas[i] : banco->perguntas[i].dificuldades == pergunta->dificuldades) &&
+            strcmp(banco->perguntas[i].conteudo_da_pergunta, pergunta->conteudo_da_pergunta) == 0)
+            return true;
+    }
+    return false;
+}
+
+int contaPerguntasDistintas(const BancoPerguntas *banco, Dificuldade dificuldade)
+{
+    int total = 0;
+    for (int i = 0; i < banco->quantidade; i++)
+    {
+        if (banco->perguntas[i].dificuldades == dificuldade && !enunciadoJaContado(banco, i, false))
+            total++;
+    }
+    return total;
+}
+
+int adicionaPerguntas(BancoPerguntas *banco, const Pergunta *pergunta)
+{
+    if (validarPergunta(pergunta))
+        return 0;
+    Pergunta copia = *pergunta;
+    if (banco->quantidade == banco->capacidade &&
+        (banco->capacidade > INT_MAX / 2 || !redimensionarBanco(banco, banco->capacidade * 2)))
+        return 0;
+
+    banco->perguntas[banco->quantidade] = copia;
+    banco->usadas[banco->quantidade++] = false;
     return 1;
 }
 
-//le as perguntas do arquivo csv e coloca no banco
-int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
-    FILE *arq;
-    
-    arq = fopen(nome_arq, "r");
-    if(arq == NULL){
-        perror("Não foi possível abrir arquivo.");
-        return 0;
-    }//if
+static bool indiceValido(const BancoPerguntas *banco, int indice)
+{
+    return indice >= 0 && indice < banco->quantidade;
+}
 
-    char linha[1200];                  //armazena temporariamente uma linha de perguntas.csv
-    fgets(linha, sizeof(linha), arq);  //serve para ignorar o cabeçalho de perguntas.csv
+bool editarPerguntaPorIndice(BancoPerguntas *banco, int indice, const Pergunta *pergunta)
+{
+    if (!indiceValido(banco, indice) || validarPergunta(pergunta))
+        return false;
+    banco->perguntas[indice] = *pergunta;
+    banco->usadas[indice] = false;
+    return true;
+}
 
-    while(fgets(linha, sizeof(linha), arq) != NULL){
-        Pergunta pergunta;
-        int i = 0;
+bool excluirPerguntaPorIndice(BancoPerguntas *banco, int indice)
+{
+    if (!indiceValido(banco, indice))
+        return false;
 
-        if((*banco).quantidade == (*banco).capacidade){   //verifica se o tamanho do vetor é suficiente para armazenar mais perguntas
-            int novaCapacidade = (*banco).capacidade * 2;
+    size_t restantes = (size_t)(banco->quantidade - indice - 1);
+    memmove(banco->perguntas + indice, banco->perguntas + indice + 1, restantes * sizeof *banco->perguntas);
+    memmove(banco->usadas + indice, banco->usadas + indice + 1, restantes * sizeof *banco->usadas);
+    banco->usadas[--banco->quantidade] = false;
+    if (banco->capacidade > CAPACIDADE_INICIAL && banco->quantidade <= banco->capacidade / 4)
+        redimensionarBanco(banco, banco->capacidade / 2);
+    return true;
+}
 
-            Pergunta *temp = realloc((*banco).perguntas, novaCapacidade * sizeof(Pergunta));
-            if(temp == NULL){
-                printf("Erro ao aumentar memoria!\n");
-                fclose(arq);
-                return 0;
-            }//if
+static bool perguntaDisponivel(const BancoPerguntas *banco, int indice,
+                               Dificuldade dificuldade, Categoria categoria)
+{
+    return !banco->usadas[indice] && banco->perguntas[indice].dificuldades == dificuldade &&
+           banco->perguntas[indice].categorias == categoria && !enunciadoJaContado(banco, indice, true);
+}
 
-            (*banco).perguntas = temp;
-
-            bool *tempUsadas = realloc((*banco).usadas,novaCapacidade * sizeof(bool));
-            if(tempUsadas == NULL){
-                printf("Erro ao aumentar memoria!\n");
-                fclose(arq);
-                return 0;
-            }//if
-
-            (*banco).usadas = tempUsadas;
-
-            for(int i = (*banco).capacidade; i < novaCapacidade; i++){
-                (*banco).usadas[i] = false;
-            }//for
-
-            (*banco).capacidade = novaCapacidade;
-
-        }//if
-
-        if(lerString(linha, &i, pergunta.conteudo_da_pergunta) == 0)
-        {
-            fclose(arq);
-            return 0;
-        }
-
-        for(int n = 0; n < 4; n++){
-            //verificando se tem o separador
-            if(linha[i] != ','){
-                printf("Erro: linha do CSV incompleta!\n");
-                fclose(arq);
-                return 0;
-            }//if
-
-            i++;  // pula o ',' anterior
-            if(lerString(linha, &i, pergunta.alternativas[n]) == 0)
-            {
-                fclose(arq);
-                return 0;
-            }//if
-        }//for
-
-        if(linha[i] != ','){
-            printf("Erro: linha do CSV incompleta!\n");
-            fclose(arq);
-            return 0;
-        }//if
-
-        i++;  //pula o ',' depois da alternativa D
-        //verificando se a alternativa tá no intervalo correto
-        if(toupper(linha[i]) < 'A' || toupper(linha[i]) > 'D'){
-            printf("Erro: alternativa correta fora do intervalo!\n");
-            fclose(arq);
-            return 0;
-        }
-        pergunta.alternativa_correta = toupper(linha[i]);  //passar a letra para maiuscula
-
-        i ++;  //vai para ',' depois da letra correta
-        //verificando se tem separador no lugar certo
-        if(linha[i] != ','){
-            printf("Erro: separador ausente!\n");
-            fclose(arq);
-            return 0;
-        }
-
-        i++; //pula o ','
-        //verificando se a dificuldade foi digitada certa
-        if(linha[i] < '1' || linha[i] > '5'){
-            printf("Erro: dificuldade invalida!\n");
-            fclose(arq);
-            return 0;
-        }
-        pergunta.dificuldades = (Dificuldade)(linha[i] - '0');  //converte os caracteres ('1' a '5') no numero da dificuldade
-
-        i ++;  //vai para ',' depois da dificulade 
-        //verificando se tem separador no lugar certo
-        if(linha[i] != ','){
-            printf("Erro: separador ausente!\n");
-            fclose(arq);
-            return 0;
-        }
-
-        i++; //pula o ','
-        //verificando se a categoria foi digitada certa
-        if(linha[i] < '1' || linha[i] > '5'){
-            printf("Erro: categoria invalida!\n");
-            fclose(arq);
-            return 0;
-        }
-        pergunta.categorias = (Categoria)(linha[i] - '0');
-
-        i++;
-        //verificando se tem algo depois da categoria
-        if(linha[i] != '\n' && linha[i] != '\0'){
-            printf("Erro: caracteres extras no final da linha!\n");
-            fclose(arq);
-            return 0;
-        }//if
-
-        //armazenando a pergunta que foi pega de "perguntas.csv"
-        (*banco).perguntas[(*banco).quantidade] = pergunta;
-        (*banco).quantidade++;
-
-    }//while
-
-    fclose(arq);
-    return 1; //indica que deu certo   
-}//carregaPerguntas
-
-//sorteia uma pergunta nao usada da dificuldade e categoria pedidas, retorna o indice ou -1
-int sorteaPergunta(BancoPerguntas *banco, Dificuldade dificuldades, Categoria categorias)
+int contaPerguntasDisponiveis(const BancoPerguntas *banco, Dificuldade dificuldade, Categoria categoria)
 {
     int disponiveis = 0;
-    int sorteadas;
-
-    //contar quantas perguntas podem ser utilizadas
-    for(int i = 0 ; i < banco->quantidade ; i++)
+    for (int i = 0; i < banco->quantidade; i++)
     {
-        if(banco->perguntas[i].categorias == categorias && banco->perguntas[i].dificuldades == dificuldades && !banco->usadas[i])
-        {
+        if (perguntaDisponivel(banco, i, dificuldade, categoria))
             disponiveis++;
-        }
     }
+    return disponiveis;
+}
 
-    //nao possui perguntas disponiveis de determinada dificuldade e categoria
-    if(disponiveis == 0)
-    {
+int sorteaPergunta(BancoPerguntas *banco, Dificuldade dificuldade, Categoria categoria)
+{
+    int disponiveis = contaPerguntasDisponiveis(banco, dificuldade, categoria);
+    if (disponiveis == 0)
         return -1;
-    }
 
-    //sorteia das disponiveis
-    sorteadas = rand() % disponiveis;
-
-    for(int i = 0 ; i < banco->quantidade ; i++)
+    int sorteada = rand() % disponiveis;
+    for (int i = 0; i < banco->quantidade; i++)
     {
-        if(banco->perguntas[i].categorias == categorias && banco->perguntas[i].dificuldades == dificuldades && !banco->usadas[i])
+        if (perguntaDisponivel(banco, i, dificuldade, categoria) && sorteada-- == 0)
         {
-            if(sorteadas == 0)
-            {
-                banco->usadas[i] = true;
-                return i;//devolve indice desejado
-            }
-            sorteadas--;
+            banco->usadas[i] = true;
+            return i;
         }
-        
     }
-
-    //retorna erro caso nao entre no if correto para retornar o i
     return -1;
 }
 
-//capta as informacoes de uma pergunta
-int lerPergunta(Pergunta *perguntas)
+static const char cabecalhoCsv[] =
+    "enunciado,alternativa_A,alternativa_B,alternativa_C,alternativa_D,alternativa_correta,dificuldade,categoria";
+
+// Campos com vírgulas são delimitados por aspas, como no formato original.
+static bool lerCampoCsv(const char **posicao, char *destino)
 {
-    char texto[300];
-    int dificuldade;
-    int categoria;
-    
-    //ler enunciado 
-    do
-    {
-        printf("Digite o enunciado da questão :");
-        fgets(texto, sizeof(texto), stdin);
-        texto[strcspn(texto, "\n")] = '\0';
-
-        if (strlen(texto) > 200)
-        {
-            printf("Pergunta muito grande !\n");
-        }
-        else if(strlen(texto) == 0)
-        {
-            printf("O enunciado não pode ser vazio !\n");
-        }
-        else if(strchr(texto, '"') != NULL)
-        {
-            printf("Não use aspas no texto !\n");
-        }
-
-    } while (strlen(texto) > 200 || strlen(texto) == 0 || strchr(texto, '"') != NULL);
-
-    strcpy(perguntas->conteudo_da_pergunta, texto);//copia a string para o lugar correto
-    
-    //le os enunciados das quatro alternativas
-    for(int i = 0 ; i < 4 ; i++)
-    {
-        do
-        {
-            printf("Digite a alternativa %c : ", 'A'+i);
-            fgets(texto, sizeof(texto), stdin);
-            texto[strcspn(texto, "\n")] = '\0';
-
-            if (strlen(texto) > 200)
-            {
-                printf("Alternativa muito grande !\n");
-            }
-            else if(strlen(texto) == 0)
-            {
-                printf("A alternativa não pode ser vazia !\n");
-            }
-            else if(strchr(texto, '"') != NULL)
-            {
-                printf("Não use aspas no texto !\n");
-            }
-
-        } while (strlen(texto) > 200 || strlen(texto) == 0 || strchr(texto, '"') != NULL);
-
-        strcpy(perguntas->alternativas[i], texto);
-    }
-
-    //le a alternativa certa 
-    do
-    {
-        printf("Digite a alternativa correta (A-D) : ");
-        scanf(" %c", &perguntas->alternativa_correta);
-
-        if(toupper(perguntas->alternativa_correta) < 'A' || toupper(perguntas->alternativa_correta) > 'D')
-        {
-            printf("Alternativa inválida !\n");
-        }
-
-        while(getchar() != '\n');
-    } while (toupper(perguntas->alternativa_correta) < 'A' || toupper(perguntas->alternativa_correta) > 'D');
-
-    perguntas->alternativa_correta = toupper(perguntas->alternativa_correta);
-    
-    //le a dificuldade
-    do
-    {
-        dificuldade = 0;
-
-        printf("Digite a dificuldade (1 - Muito fácil, 2 - Fácil, 3 - Médio, 4 - Difícil, 5 - Impossível): ");
-        scanf(" %d", &dificuldade);
-
-        if(dificuldade < 1 || dificuldade > 5)
-        {
-            printf("Dificuldade inválida !\n");
-        }
-
-        while(getchar() != '\n');
-    } while (dificuldade < 1 || dificuldade > 5);
-
-    perguntas->dificuldades = (Dificuldade) dificuldade;
-
-    //le a categoria
-    do
-    {
-        categoria = 0;
-
-        printf("Digite a categoria (1 - Geek, 2 - Esportes, 3 - Matematica, 4 - Geografia, 5 - Biologia): ");
-        scanf(" %d", &categoria);
-
-        if(categoria < 1 || categoria > 5)
-        {
-            printf("Categoria inválida !\n");
-        }
-
-        while(getchar() != '\n');
-    } while (categoria < 1 || categoria > 5);
-
-    perguntas->categorias = (Categoria) categoria;
-    
-    return 1;
+    const char *inicio = *posicao;
+    bool entreAspas = *inicio == '"';
+    inicio += entreAspas;
+    const char *fim = inicio + strcspn(inicio, entreAspas ? "\"\r\n" : ",\r\n");
+    size_t comprimento = (size_t)(fim - inicio);
+    if (comprimento == 0 || comprimento > LIMITE_TEXTO_PERGUNTA)
+        return false;
+    if (entreAspas && *fim++ != '"')
+        return false;
+    if (*fim != ',')
+        return false;
+    memcpy(destino, inicio, comprimento);
+    destino[comprimento] = '\0';
+    *posicao = fim + 1;
+    return true;
 }
 
-//adiciona uma pergunta no banco, aumentando o vetor se precisar
-int adicionaPerguntas(BancoPerguntas *banco, Pergunta *perguntas)
+static bool lerRegistroCsv(const char *linha, Pergunta *pergunta)
 {
-    //bloco copiado da funcao acima, sem fclose(arq)
-    //verifica se o tamanho do vetor é suficiente para armazenar mais perguntas
-    if((*banco).quantidade == (*banco).capacidade)
-    {   
-        int novaCapacidade = (*banco).capacidade * 2;
-
-        Pergunta *temp = realloc((*banco).perguntas, novaCapacidade * sizeof(Pergunta));
-        if(temp == NULL){
-            printf("Erro ao aumentar memoria!\n");
-            return 0;
-        }
-
-        (*banco).perguntas = temp;
-
-        bool *tempUsadas = realloc((*banco).usadas, novaCapacidade * sizeof(bool));
-        if(tempUsadas == NULL){
-            printf("Erro ao aumentar memoria!\n");
-            return 0;
-        }
-
-        (*banco).usadas = tempUsadas;
-
-        for(int i = (*banco).capacidade; i < novaCapacidade; i++){
-            (*banco).usadas[i] = false;
-        }
-
-        (*banco).capacidade = novaCapacidade;
-
+    if (!lerCampoCsv(&linha, pergunta->conteudo_da_pergunta))
+        return false;
+    for (int i = 0; i < 4; i++)
+    {
+        if (!lerCampoCsv(&linha, pergunta->alternativas[i]))
+            return false;
     }
+    if (strcspn(linha, "\r\n") != 5 || linha[1] != ',' || linha[3] != ',' ||
+        linha[2] < '1' || linha[2] > '5' || linha[4] < '1' || linha[4] > '5')
+        return false;
+    size_t fim = 5;
+    if (linha[fim] == '\r')
+        fim++;
+    if (linha[fim] == '\n')
+        fim++;
+    if (linha[fim] != '\0')
+        return false;
 
-    //coloca a pergunta na primeira posicao livre
-    banco->perguntas[banco->quantidade] = *perguntas; 
-    banco->usadas[banco->quantidade] = false;
-
-    banco->quantidade++;
-
-    return 1;
+    pergunta->alternativa_correta = (char)toupper((unsigned char)linha[0]);
+    pergunta->dificuldades = (Dificuldade)(linha[2] - '0');
+    pergunta->categorias = (Categoria)(linha[4] - '0');
+    return true;
 }
 
-//printa as perguntas no arquivo csv
-int salvaPergunta(BancoPerguntas *banco, char *nome_arq)
+static int concluirLeitura(BancoPerguntas *banco, BancoPerguntas *novo, bool ok)
 {
-    FILE *arq;
-
-    arq = fopen(nome_arq, "w");
-
-    if(arq == NULL)
+    if (!ok)
     {
-        perror("Erro ao abrir o arquivo.");
+        liberaBancoPergunta(novo);
         return 0;
     }
-
-    fprintf(arq, "enunciado,alternativa_A,alternativa_B,alternativa_C,alternativa_D,alternativa_correta,dificuldade,categoria\n");
-
-    for(int i = 0 ; i < banco->quantidade ; i++)
-    {
-        fprintf(arq, "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%c,%d,%d\n",
-                banco->perguntas[i].conteudo_da_pergunta,
-                banco->perguntas[i].alternativas[0], 
-                banco->perguntas[i].alternativas[1], 
-                banco->perguntas[i].alternativas[2], 
-                banco->perguntas[i].alternativas[3], 
-                banco->perguntas[i].alternativa_correta, 
-                banco->perguntas[i].dificuldades,
-                banco->perguntas[i].categorias);
-    }
-
-    fclose(arq);
-
+    liberaBancoPergunta(banco);
+    *banco = *novo;
     return 1;
 }
 
-//mostra todas as perguntas do banco
-int listaPergunta (BancoPerguntas *banco)
+static int lerLinhaCsv(FILE *arq, char *linha, size_t capacidade)
 {
-    if(banco->quantidade == 0)
+    size_t tamanho = 0;
+    int c;
+    while ((c = fgetc(arq)) != EOF)
     {
-        printf("Nenhuma pergunta cadastrada !\n");
+        if (c == '\0' || tamanho + 1 >= capacidade)
+            return -1;
+        linha[tamanho++] = (char)c;
+        if (c == '\n')
+            break;
+    }
+    linha[tamanho] = '\0';
+    return ferror(arq) ? -1 : tamanho > 0;
+}
+
+int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq)
+{
+    // Abre em modo binário para detectar bytes inválidos também no Windows.
+    FILE *arq = fopen(nome_arq, "rb");
+    if (!arq)
         return 0;
-    }
-
-    for(int i = 0 ; i < banco->quantidade ; i++)
+    BancoPerguntas novo;
+    bool ok = inicializaBanco(&novo);
+    char linha[1200] = {0};
+    if (ok)
     {
-        printf("====== Pergunta %d ======\n", i+1);
-        printf("%s\n", banco->perguntas[i].conteudo_da_pergunta);
-        printf(" A) %s\n", banco->perguntas[i].alternativas[0]);
-        printf(" B) %s\n", banco->perguntas[i].alternativas[1]);
-        printf(" C) %s\n", banco->perguntas[i].alternativas[2]);
-        printf(" D) %s\n", banco->perguntas[i].alternativas[3]);
-        switch (banco->perguntas[i].dificuldades)
+        ok = lerLinhaCsv(arq, linha, sizeof linha) > 0;
+        if (ok)
         {
-        case MUITO_FACIL:
-            printf("Alternativa correta : %c | Dificuldade : Muito fácil | ", banco->perguntas[i].alternativa_correta);
-            break;
-        
-        case FACIL:
-            printf("Alternativa correta : %c | Dificuldade : Fácil | ", banco->perguntas[i].alternativa_correta);
-            break;
-
-        case MEDIO:
-            printf("Alternativa correta : %c | Dificuldade : Médio | ", banco->perguntas[i].alternativa_correta);
-            break;
-
-        case DIFICIL:
-            printf("Alternativa correta : %c | Dificuldade : Difícil | ", banco->perguntas[i].alternativa_correta);
-            break;
-
-        case IMPOSSIVEL:
-            printf("Alternativa correta : %c | Dificuldade : Impossível | ", banco->perguntas[i].alternativa_correta);
-            break;
-        }
-
-        switch (banco->perguntas[i].categorias)
-        {
-        case GEEK:
-            printf("Categoria : Geek\n\n");
-            break;
-        
-        case ESPORTES:
-            printf("Categoria : Esportes\n\n");
-            break;
-
-        case MATEMATICA:
-            printf("Categoria : Matematica\n\n");
-            break;
-
-        case GEOGRAFIA:
-            printf("Categoria : Geografia\n\n");
-            break;
-
-        case BIOLOGIA:
-            printf("Categoria : Biologia\n\n");
-            break;
+            const char *inicio = linha;
+            if ((unsigned char)linha[0] == 0xEF && (unsigned char)linha[1] == 0xBB &&
+                (unsigned char)linha[2] == 0xBF)
+                inicio += 3;
+            linha[strcspn(linha, "\r\n")] = '\0';
+            ok = strcmp(inicio, cabecalhoCsv) == 0;
         }
     }
 
+    int lida = 0;
+    while (ok && (lida = lerLinhaCsv(arq, linha, sizeof linha)) > 0)
+    {
+        Pergunta pergunta = {0};
+        ok = lerRegistroCsv(linha, &pergunta) && adicionaPerguntas(&novo, &pergunta);
+    }
+    ok = ok && lida >= 0;
+    if (fclose(arq) != 0)
+        ok = false;
+    return concluirLeitura(banco, &novo, ok);
+}
+
+int carregaBinario(BancoPerguntas *banco, const char *nome_arq)
+{
+    FILE *arq = fopen(nome_arq, "rb");
+    if (!arq)
+        return 0;
+    BancoPerguntas novo;
+    bool ok = inicializaBanco(&novo);
+    int quantidade = -1;
+    if (ok)
+        ok = fread(&quantidade, sizeof quantidade, 1, arq) == 1 && quantidade >= 0 &&
+             fseek(arq, 0, SEEK_END) == 0;
+    if (ok)
+    {
+        long tamanho = ftell(arq);
+        long dados = tamanho - (long)sizeof quantidade;
+        // O arquivo legado tem um int e um vetor com o layout de Pergunta.
+        ok = tamanho >= (long)sizeof quantidade && dados % (long)sizeof(Pergunta) == 0 &&
+             dados / (long)sizeof(Pergunta) == quantidade &&
+             fseek(arq, (long)sizeof quantidade, SEEK_SET) == 0;
+    }
+    if (ok && quantidade > novo.capacidade)
+        ok = redimensionarBanco(&novo, quantidade);
+    if (ok)
+    {
+        ok = fread(novo.perguntas, sizeof(Pergunta), (size_t)quantidade, arq) == (size_t)quantidade;
+        for (int i = 0; ok && i < quantidade; i++)
+            ok = !validarPergunta(&novo.perguntas[i]);
+        novo.quantidade = quantidade;
+    }
+    if (fclose(arq) != 0)
+        ok = false;
+    return concluirLeitura(banco, &novo, ok);
+}
+
+int salvaPergunta(const BancoPerguntas *banco, const char *nome_arq)
+{
+    FILE *arq = fopen(nome_arq, "w");
+    if (!arq)
+        return 0;
+    bool ok = fprintf(arq, "%s\n", cabecalhoCsv) >= 0;
+    for (int i = 0; ok && i < banco->quantidade; i++)
+    {
+        const Pergunta *p = &banco->perguntas[i];
+        ok = !validarPergunta(p) && fprintf(arq, "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%c,%d,%d\n",
+                p->conteudo_da_pergunta, p->alternativas[0], p->alternativas[1], p->alternativas[2],
+                p->alternativas[3], p->alternativa_correta, p->dificuldades, p->categorias) >= 0;
+    }
+    return fclose(arq) == 0 && ok;
+}
+
+int salvaBinario(const BancoPerguntas *banco, const char *nome_arq)
+{
+    FILE *arq = fopen(nome_arq, "wb");
+    if (!arq)
+        return 0;
+    bool ok = fwrite(&banco->quantidade, sizeof(int), 1, arq) == 1 &&
+              fwrite(banco->perguntas, sizeof(Pergunta), (size_t)banco->quantidade, arq) ==
+              (size_t)banco->quantidade;
+    return fclose(arq) == 0 && ok;
+}
+
+// A partir daqui ficam as operações que pedem dados ou imprimem no terminal.
+static int lerLinhaTerminal(char *texto, size_t capacidade)
+{
+    if (!fgets(texto, (int)capacidade, stdin))
+        return 0;
+    size_t fim = strcspn(texto, "\r\n");
+    if (texto[fim] == '\0' && !feof(stdin))
+    {
+        int c;
+        while ((c = getchar()) != '\n' && c != EOF) {}
+        return -1;
+    }
+    texto[fim] = '\0';
     return 1;
 }
 
-//procura perguntas pelo texto do enunciado
+static bool lerTextoTerminal(const char *rotulo, char *destino)
+{
+    char texto[LIMITE_TEXTO_PERGUNTA + 3];
+    for (;;)
+    {
+        printf("%s: ", rotulo);
+        int leitura = lerLinhaTerminal(texto, sizeof texto);
+        if (leitura == 0)
+            return false;
+        if (leitura > 0 && textoValido(texto))
+        {
+            strcpy(destino, texto);
+            return true;
+        }
+        puts("Use até 200 bytes, com texto válido e sem aspas.");
+    }
+}
+
+static int lerNumeroTerminal(const char *rotulo, int minimo, int maximo)
+{
+    char linha[48];
+    for (;;)
+    {
+        printf("%s: ", rotulo);
+        int leitura = lerLinhaTerminal(linha, sizeof linha);
+        if (leitura == 0)
+            return -1;
+        if (leitura > 0)
+        {
+            char *fim;
+            long valor = strtol(linha, &fim, 10);
+            while (isspace((unsigned char)*fim))
+                fim++;
+            if (fim != linha && *fim == '\0' && valor >= minimo && valor <= maximo)
+                return (int)valor;
+        }
+        puts("Número inválido.");
+    }
+}
+
+const char *nomeCategoria(Categoria categoria)
+{
+    static const char *const nomes[] = {"Geek", "Esportes", "Matemática", "Geografia", "Biologia"};
+    return categoria >= GEEK && categoria <= BIOLOGIA ? nomes[categoria - GEEK] : "";
+}
+
+const char *nomeDificuldade(Dificuldade dificuldade)
+{
+    static const char *const nomes[] = {"Muito fácil", "Fácil", "Médio", "Difícil", "Impossível"};
+    return dificuldade >= MUITO_FACIL && dificuldade <= IMPOSSIVEL ? nomes[dificuldade - MUITO_FACIL] : "";
+}
+
+int lerPergunta(Pergunta *pergunta)
+{
+    Pergunta nova = {0};
+    if (!lerTextoTerminal("Enunciado", nova.conteudo_da_pergunta))
+        return 0;
+    for (int i = 0; i < 4; i++)
+    {
+        char rotulo[] = "Alternativa A";
+        rotulo[12] = (char)('A' + i);
+        if (!lerTextoTerminal(rotulo, nova.alternativas[i]))
+            return 0;
+    }
+
+    char linha[16];
+    for (;;)
+    {
+        printf("Alternativa correta (A-D): ");
+        int leitura = lerLinhaTerminal(linha, sizeof linha);
+        if (leitura == 0)
+            return 0;
+        if (leitura > 0 && strlen(linha) == 1)
+        {
+            nova.alternativa_correta = (char)toupper((unsigned char)linha[0]);
+            if (nova.alternativa_correta >= 'A' && nova.alternativa_correta <= 'D')
+                break;
+        }
+        puts("Alternativa inválida.");
+    }
+
+    int dificuldade = lerNumeroTerminal("Dificuldade (1 Muito fácil, 2 Fácil, 3 Médio, 4 Difícil, 5 Impossível)", 1, 5);
+    if (dificuldade < 0)
+        return 0;
+    int categoria = lerNumeroTerminal("Categoria (1 Geek, 2 Esportes, 3 Matemática, 4 Geografia, 5 Biologia)", 1, 5);
+    if (categoria < 0)
+        return 0;
+    nova.dificuldades = (Dificuldade)dificuldade;
+    nova.categorias = (Categoria)categoria;
+    *pergunta = nova;
+    return 1;
+}
+
+static void imprimirPergunta(const BancoPerguntas *banco, int indice)
+{
+    const Pergunta *p = &banco->perguntas[indice];
+    printf("====== Pergunta %d ======\n%s\n", indice + 1, p->conteudo_da_pergunta);
+    for (int i = 0; i < 4; i++)
+        printf(" %c) %s\n", 'A' + i, p->alternativas[i]);
+    printf("Alternativa correta: %c | Dificuldade: %s | Categoria: %s\n\n", p->alternativa_correta,
+           nomeDificuldade(p->dificuldades), nomeCategoria(p->categorias));
+}
+
+int listaPergunta(BancoPerguntas *banco)
+{
+    for (int i = 0; i < banco->quantidade; i++)
+        imprimirPergunta(banco, i);
+    if (banco->quantidade == 0)
+        puts("Nenhuma pergunta cadastrada.");
+    return banco->quantidade != 0;
+}
+
 int pesquisaPergunta(BancoPerguntas *banco)
 {
-    char texto[201];
+    char texto[LIMITE_TEXTO_PERGUNTA + 2];
+    printf("Digite o trecho do enunciado: ");
+    if (lerLinhaTerminal(texto, sizeof texto) <= 0 || !texto[0])
+        return 0;
     int encontradas = 0;
-
-    if(banco->quantidade == 0)
+    for (int i = 0; i < banco->quantidade; i++)
     {
-        printf("Ainda nao existem perguntas no programa !\n");
-        return 0;
-    }
-
-    printf("Digite o enunciado da pergunta que deseja encontrar : ");
-    fgets(texto, sizeof(texto), stdin);
-    texto[strcspn(texto, "\n")] = '\0';
-
-    if(strlen(texto) == 0)
-    {
-        printf("Busca invalida !\n");
-        return 0;
-    }
-
-    for(int i = 0 ; i < banco->quantidade ; i++)
-    {
-        if(strstr(banco->perguntas[i].conteudo_da_pergunta, texto) != NULL)
+        if (perguntaContem(&banco->perguntas[i], texto))
         {
+            imprimirPergunta(banco, i);
             encontradas++;
-
-            printf("====== Pergunta %d ======\n", i+1);
-            printf("%s\n", banco->perguntas[i].conteudo_da_pergunta);
-            printf(" A) %s\n", banco->perguntas[i].alternativas[0]);
-            printf(" B) %s\n", banco->perguntas[i].alternativas[1]);
-            printf(" C) %s\n", banco->perguntas[i].alternativas[2]);
-            printf(" D) %s\n", banco->perguntas[i].alternativas[3]);
-            switch (banco->perguntas[i].dificuldades)
-            {
-            case MUITO_FACIL:
-                printf("Alternativa correta : %c | Dificuldade : Muito fácil | ", banco->perguntas[i].alternativa_correta);
-                break;
-            
-            case FACIL:
-                printf("Alternativa correta : %c | Dificuldade : Fácil | ", banco->perguntas[i].alternativa_correta);
-                break;
-
-            case MEDIO:
-                printf("Alternativa correta : %c | Dificuldade : Médio | ", banco->perguntas[i].alternativa_correta);
-                break;
-
-            case DIFICIL:
-                printf("Alternativa correta : %c | Dificuldade : Difícil | ", banco->perguntas[i].alternativa_correta);
-                break;
-
-            case IMPOSSIVEL:
-                printf("Alternativa correta : %c | Dificuldade : Impossível | ", banco->perguntas[i].alternativa_correta);
-                break;
-            }
-
-            switch (banco->perguntas[i].categorias)
-            {
-            case GEEK:
-                printf("Categoria : Geek\n\n");
-                break;
-            
-            case ESPORTES:
-                printf("Categoria : Esportes\n\n");
-                break;
-
-            case MATEMATICA:
-                printf("Categoria : Matematica\n\n");
-                break;
-
-            case GEOGRAFIA:
-                printf("Categoria : Geografia\n\n");
-                break;
-
-            case BIOLOGIA:
-                printf("Categoria : Biologia\n\n");
-                break;
-            }
-            }
+        }
     }
-
-    if(encontradas == 0)
-    {
-        printf("Nao foram encontradas perguntas relacionadas a sua busca !\n");
-        return 0;
-    }
-
+    if (encontradas == 0)
+        puts("Nenhuma pergunta encontrada.");
     return encontradas;
 }
 
 int excluiPergunta(BancoPerguntas *banco)
 {
-
-    int indice_removido = 0;
-
-    if(banco->quantidade == 0)
+    if (banco->quantidade == 0)
     {
-        printf("O programa nao possui perguntas !\n");
+        puts("Nenhuma pergunta cadastrada.");
         return 0;
     }
-
-    printf("Digite o indice da pergunta a ser removida : ");
-    scanf(" %d", &indice_removido);
-
-    while(getchar() != '\n');
-
-    if(indice_removido < 1 || indice_removido > banco->quantidade)
-    {
-        printf("Indice invalido !\n");
-        return 0;
-    }
-
-    for(int i = (indice_removido - 1) ; i < banco->quantidade - 1 ; i++)
-    {
-        banco->perguntas[i] = banco->perguntas[i + 1];
-        banco->usadas[i] = banco->usadas[i + 1];
-    }
-
-    banco->quantidade--;
-
-    //realocar memoria
-    if(banco->quantidade <= banco->capacidade / 4 && banco->capacidade > 5)
-    {   
-        int novaCapacidade = banco->capacidade / 2;
-
-        Pergunta *temp = realloc(banco->perguntas, novaCapacidade * sizeof(Pergunta));
-
-        bool *tempUsadas = realloc(banco->usadas, novaCapacidade * sizeof(bool));
-
-        if(temp != NULL)
-        {
-            banco->perguntas = temp;
-        }
-
-        if(tempUsadas != NULL)
-        {
-            banco->usadas = tempUsadas;
-        }
-
-        if(temp != NULL && tempUsadas != NULL)
-        {
-            banco->capacidade = novaCapacidade;
-        }
-    }
-
-    return 1;
+    int numero = lerNumeroTerminal("Número da pergunta a excluir (0 cancela)", 0, banco->quantidade);
+    return numero > 0 && excluirPerguntaPorIndice(banco, numero - 1);
 }
 
 int alteraPergunta(BancoPerguntas *banco)
 {
-    int indice = 0, numero_real;
-
-    if(banco->quantidade == 0)
+    if (banco->quantidade == 0)
     {
-        printf("O programa nao possui perguntas para serem alteradas !\n");
+        puts("Nenhuma pergunta cadastrada.");
         return 0;
     }
-
-    printf("Digite o numero da pergunta : ");
-    scanf(" %d", &indice);
-
-    while(getchar() != '\n');
-
-    if(indice < 1 || indice > banco->quantidade)
-    {
-        printf("Numero invalido !\n");
-        return 0;
-    }
-
-    numero_real = indice - 1;
-
-    char texto[300];
-    int nova_dificuldade;
-    int nova_categoria;
-    
-    //ler enunciado 
-    do
-    {
-        printf("Digite o novo enunciado da questão :");
-        fgets(texto, sizeof(texto), stdin);
-        texto[strcspn(texto, "\n")] = '\0';
-
-        if (strlen(texto) > 200)
-        {
-            printf("Pergunta muito grande !\n");
-        }
-        else if(strlen(texto) == 0)
-        {
-            printf("O enunciado não pode ser vazio !\n");
-        }
-        else if(strchr(texto, '"') != NULL)
-        {
-            printf("Não use aspas no texto !\n");
-        }
-
-    } while (strlen(texto) > 200 || strlen(texto) == 0 || strchr(texto, '"') != NULL);
-
-    strcpy(banco->perguntas[numero_real].conteudo_da_pergunta, texto);//copia a string para o lugar correto
-
-    //le os enunciados das quatro alternativas
-    for(int i = 0 ; i < 4 ; i++)
-    {
-        do
-        {
-            printf("Digite a nova alternativa %c : ", 'A'+i);
-            fgets(texto, sizeof(texto), stdin);
-            texto[strcspn(texto, "\n")] = '\0';
-
-            if (strlen(texto) > 200)
-            {
-                printf("Alternativa muito grande !\n");
-            }
-            else if(strlen(texto) == 0)
-            {
-                printf("A alternativa não pode ser vazia !\n");
-            }
-            else if(strchr(texto, '"') != NULL)
-            {
-                printf("Não use aspas no texto !\n");
-            }
-
-        } while (strlen(texto) > 200 || strlen(texto) == 0 || strchr(texto, '"') != NULL);
-
-        strcpy(banco->perguntas[numero_real].alternativas[i], texto);
-    }
-
-    //le a alternativa certa 
-    do
-    {
-        printf("Digite a alternativa correta (A-D) : ");
-        scanf(" %c", &banco->perguntas[numero_real].alternativa_correta);
-
-        if(toupper(banco->perguntas[numero_real].alternativa_correta) < 'A' || toupper(banco->perguntas[numero_real].alternativa_correta) > 'D')
-        {
-            printf("Alternativa inválida !\n");
-        }
-
-        while(getchar() != '\n');
-    } while (toupper(banco->perguntas[numero_real].alternativa_correta) < 'A' || toupper(banco->perguntas[numero_real].alternativa_correta) > 'D');
-
-    banco->perguntas[numero_real].alternativa_correta = toupper(banco->perguntas[numero_real].alternativa_correta);
-    
-    //le a dificuldade
-    do
-    {
-        nova_dificuldade = 0;
-
-        printf("Digite a dificuldade (1 - Muito fácil, 2 - Fácil, 3 - Médio, 4 - Difícil, 5 - Impossível): ");
-        scanf(" %d", &nova_dificuldade);
-
-        if(nova_dificuldade < 1 || nova_dificuldade > 5)
-        {
-            printf("Dificuldade inválida !\n");
-        }
-
-        while(getchar() != '\n');
-    } while (nova_dificuldade < 1 || nova_dificuldade > 5);
-
-    banco->perguntas[numero_real].dificuldades = (Dificuldade) nova_dificuldade;
-
-    //le a categoria
-    do
-    {
-        nova_categoria = 0;
-
-        printf("Digite a categoria (1 - Geek, 2 - Esportes, 3 - Matematica, 4 - Geografia, 5 - Biologia): ");
-        scanf(" %d", &nova_categoria);
-
-        if(nova_categoria < 1 || nova_categoria > 5)
-        {
-            printf("Categoria inválida !\n");
-        }
-
-        while(getchar() != '\n');
-    } while (nova_categoria < 1 || nova_categoria > 5);
-
-    banco->perguntas[numero_real].categorias = (Categoria) nova_categoria;
-    
-    return 1;
-}
-
-int salvaBinario(BancoPerguntas *banco, const char *nome_arq)
-{
-    FILE *arq;
-
-    arq = fopen(nome_arq, "wb");
-
-    if(arq == NULL)
-    {
-        printf("Erro na abertura do arquivo %s\n", nome_arq);
-        return 0;
-    }
-
-    fwrite(&banco->quantidade, sizeof(int), 1, arq);
-    fwrite(banco->perguntas, sizeof(Pergunta), banco->quantidade, arq);
-    fclose(arq);
-
-    return 1;
-}
-
-int carregaBinario(BancoPerguntas *banco, const char *nome_arq)
-{
-    FILE *arq;
-
-    arq = fopen(nome_arq, "rb");
-
-    if(arq == NULL)
-    {
-        return 0;
-    }
-
-    int quantidade;
-
-    if(fread(&quantidade, sizeof(int), 1, arq) != 1)
-    {
-        fclose(arq);
-        return 0;
-    }
-
-    if(quantidade > banco->capacidade)
-    {
-        int novaCapacidade = banco->capacidade;
-
-        while(quantidade > novaCapacidade)
-        {
-            novaCapacidade = novaCapacidade * 2;
-        }
-
-        Pergunta *temp = realloc(banco->perguntas, novaCapacidade * sizeof(Pergunta));
-        bool *tempUsadas = realloc(banco->usadas, novaCapacidade * sizeof(bool));
-
-        if(temp != NULL)
-        {
-            banco->perguntas = temp;
-        }
-
-        if(tempUsadas != NULL)
-        {
-            banco->usadas = tempUsadas;
-        }
-
-        if(temp == NULL || tempUsadas == NULL)
-        {
-            fclose(arq);
-            return 0;
-        }
-
-        banco->capacidade = novaCapacidade;
-    }
-
-    if(fread(banco->perguntas, sizeof(Pergunta), quantidade, arq) != (size_t)quantidade)
-    {
-        fclose(arq);
-        return 0;
-    }
-
-    banco->quantidade = quantidade;
-
-    for(int i = 0; i < banco->capacidade ; i++)
-    {
-        banco->usadas[i] = false;
-    }
-
-    fclose(arq);
-    return 1;
+    int numero = lerNumeroTerminal("Número da pergunta a alterar (0 cancela)", 0, banco->quantidade);
+    Pergunta nova;
+    return numero > 0 && lerPergunta(&nova) && editarPerguntaPorIndice(banco, numero - 1, &nova);
 }

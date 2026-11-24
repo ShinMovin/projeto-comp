@@ -15,9 +15,14 @@
 typedef enum {GEEK = 1, ESPORTES, MATEMATICA, GEOGRAFIA, BIOLOGIA} Categoria;
 typedef enum {MUITO_FACIL = 1, FACIL, MEDIO, DIFICIL, IMPOSSIVEL} Dificuldade;
 
+const char *nomeCategoria(Categoria categoria);
+const char *nomeDificuldade(Dificuldade dificuldade);
+
+enum { LIMITE_TEXTO_PERGUNTA = 200 };
+
 typedef struct {
-    char conteudo_da_pergunta[201];
-    char alternativas[4][201];
+    char conteudo_da_pergunta[LIMITE_TEXTO_PERGUNTA + 1];
+    char alternativas[4][LIMITE_TEXTO_PERGUNTA + 1];
     char alternativa_correta;
     Dificuldade dificuldades;
     Categoria categorias;
@@ -39,11 +44,14 @@ int inicializaBanco(BancoPerguntas *banco);
 
 /**
  * @brief Le as perguntas do arquivo CSV para o banco.
- * @param banco banco de destino
+ * @param banco banco inicializado ou zerado, substituído apenas em caso de sucesso
  * @param nome_arq caminho do CSV
  * @return 1 se deu certo, 0 se deu erro
  */
 int carregaPerguntas (BancoPerguntas *banco, const char *nome_arq);
+
+/** @brief Conta perguntas ainda não usadas da categoria e dificuldade indicadas. */
+int contaPerguntasDisponiveis(const BancoPerguntas *banco, Dificuldade dificuldade, Categoria categoria);
 
 /**
  * @brief Sorteia uma pergunta nao usada e a marca como usada.
@@ -73,7 +81,15 @@ int lerPergunta(Pergunta *perguntas);
  * @param perguntas pergunta a adicionar
  * @return 1 se deu certo, 0 se faltou memoria
  */
-int adicionaPerguntas(BancoPerguntas *banco, Pergunta *perguntas);
+int adicionaPerguntas(BancoPerguntas *banco, const Pergunta *perguntas);
+
+/** @brief Retorna NULL quando todos os campos são válidos. */
+const char *validarPergunta(const Pergunta *pergunta);
+bool perguntasIguais(const Pergunta *a, const Pergunta *b);
+bool perguntaContem(const Pergunta *pergunta, const char *trecho);
+int contaPerguntasDistintas(const BancoPerguntas *banco, Dificuldade dificuldade);
+bool editarPerguntaPorIndice(BancoPerguntas *banco, int indice, const Pergunta *pergunta);
+bool excluirPerguntaPorIndice(BancoPerguntas *banco, int indice);
 
 /**
  * @brief Grava todas as perguntas em um arquivo CSV.
@@ -81,7 +97,7 @@ int adicionaPerguntas(BancoPerguntas *banco, Pergunta *perguntas);
  * @param nome_arq caminho do CSV
  * @return 1 se deu certo, 0 se deu erro
  */
-int salvaPergunta(BancoPerguntas *banco, char *nome_arq);
+int salvaPergunta(const BancoPerguntas *banco, const char *nome_arq);
 
 /**
  * @brief Mostra todas as perguntas do banco.
@@ -117,14 +133,14 @@ int excluiPergunta (BancoPerguntas *banco);
  * @param nome_arq caminho do arquivo
  * @return 1 se deu certo, 0 se deu erro
  */
-int salvaBinario(BancoPerguntas *banco, const char *nome_arq);
+int salvaBinario(const BancoPerguntas *banco, const char *nome_arq);
 
 /**
  * @brief Le o banco do arquivo binario, aumentando o vetor se precisar.
- * @param banco banco de destino
+ * @param banco banco inicializado ou zerado, substituído apenas em caso de sucesso
  * @param nome_arq caminho do arquivo
  * @return 1 se deu certo, 0 se nao existe ou deu erro
  */
 int carregaBinario(BancoPerguntas *banco, const char *nome_arq);
 
-#endif 
+#endif
