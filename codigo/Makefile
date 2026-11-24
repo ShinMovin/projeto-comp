@@ -33,7 +33,10 @@ JOGO = $(PASTA)/jogo$(EXT)
 
 # Minigame Guitar Hero (tem main proprio, por isso compila separado)
 GUITARHERO_FONTES = minigames/guitarhero/guitarhero.c
+GUITARHERO_MAPAS = minigames/guitarhero/mapas.h
 GUITARHERO = $(PASTA)/guitarhero$(EXT)
+GUITARHERO_AUDIO = $(addprefix $(PASTA)/guitarhero-musicas/, \
+    harry-potter.wav blue-bird.wav sweden.wav)
 
 # Minigame Tiro ao Alvo (tambem tem main proprio)
 TIROALVO_FONTES = minigames/tiroalvo/tiroalvo.c
@@ -63,9 +66,13 @@ run: $(JOGO)
 
 guitarhero: $(GUITARHERO)
 
-$(GUITARHERO): $(GUITARHERO_FONTES) Makefile $(RAYLIB_ARQUIVO)
+$(GUITARHERO): $(GUITARHERO_FONTES) $(GUITARHERO_MAPAS) Makefile $(RAYLIB_ARQUIVO) | $(GUITARHERO_AUDIO)
 	mkdir -p "$(PASTA)"
 	$(CC) -std=c99 $(CPPFLAGS) $(RAYLIB_CFLAGS) $(CFLAGS) $(GUITARHERO_FONTES) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
+
+$(PASTA)/guitarhero-musicas/%: minigames/guitarhero/musicas/%
+	mkdir -p "$(@D)"
+	cp "$<" "$@"
 
 run-guitarhero: $(GUITARHERO)
 	$(GUITARHERO)
@@ -84,4 +91,4 @@ run-tiroalvo: $(TIROALVO)
 	$(TIROALVO)
 
 clean:
-	rm -f $(JOGO) $(GUITARHERO) $(TIROALVO) $(TIROALVO_AUDIO)
+	rm -f $(JOGO) $(GUITARHERO) $(GUITARHERO_AUDIO) $(TIROALVO) $(TIROALVO_AUDIO)
