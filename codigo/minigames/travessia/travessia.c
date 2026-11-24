@@ -69,6 +69,7 @@ typedef struct
     int colunaSegura, linhaSegura;      // última casa de grama pisada: volta para cá ao ser atropelado
     float invencivel;                   // pisca e não pode ser atropelado
     float contagem;                     // "3, 2, 1" antes de começar
+    bool infinito;                      // treino: sem chegada, vai até acabarem as vidas
     ResultadoMinigame resultado;
 } SessaoTravessia;
 
@@ -91,7 +92,7 @@ static void gerarPista(SessaoTravessia *sessao, int linha)
     *p = (Pista){.linha = linha, .tipo = PISTA_GRAMA};
 
     // As primeiras pistas e a chegada são grama livre, para o jogador começar e terminar em paz.
-    bool areaSegura = linha < 3 || linha >= META_PISTAS;
+    bool areaSegura = linha < 3 || (!sessao->infinito && linha >= META_PISTAS);
     int sorteio = rand() % 100;
     if (!areaSegura && sorteio < 20)
     {
@@ -166,7 +167,8 @@ static void perderVida(SessaoTravessia *sessao, bool ficouParaTras)
     sessao->vidas--;
     if (sessao->vidas <= 0)
     {
-        sessao->resultado = MINIGAME_DERROTA;
+        // No modo infinito não existe "perder": acabar as vidas encerra o treino com a pontuação feita.
+        sessao->resultado = sessao->infinito ? MINIGAME_VITORIA : MINIGAME_DERROTA;
         return;
     }
     sessao->invencivel = DURACAO_INVENCIVEL;
@@ -325,7 +327,6 @@ static bool levarPeloRio(SessaoTravessia *sessao, float dt)
 
 static void *IniciarTravessia(bool treino, int opcao)
 {
-    (void)treino;
     if (opcao != 0)
         return NULL;
     SessaoTravessia *sessao = calloc(1, sizeof *sessao);
@@ -336,6 +337,7 @@ static void *IniciarTravessia(bool treino, int opcao)
     sessao->coluna = sessao->colunaAnterior = COLUNAS / 2;
     sessao->vidas = VIDAS_INICIAIS;
     sessao->contagem = DURACAO_CONTAGEM;
+    sessao->infinito = treino;
     sessao->resultado = MINIGAME_EM_CURSO;
     garantirPistas(sessao);
     return sessao;
@@ -365,7 +367,7 @@ static ResultadoMinigame AtualizarTravessia(void *dados, float dt)
         sessao->colunaSegura = sessao->coluna;
         sessao->linhaSegura = sessao->linha;
     }
-    if (sessao->maiorLinha >= META_PISTAS)
+    if (!sessao->infinito && sessao->maiorLinha >= META_PISTAS)
     {
         sessao->resultado = MINIGAME_VITORIA;
         return sessao->resultado;
@@ -478,7 +480,7 @@ static void desenharPista(const SessaoTravessia *sessao, int linha)
     }
 
     DrawRectangle(0, (int)y, LARGURA, CELULA, linha % 2 ? corGramaClara : corGramaEscura);
-    if (linha == META_PISTAS)
+    if (linha == META_PISTAS && !sessao->infinito)
     {
         for (int x = 0; x < LARGURA; x += 20)
             DrawRectangle(x, (int)y + ((x / 20) % 2) * 25, 20, 25, Fade(corJogador, 0.7f));
@@ -530,7 +532,10 @@ static void DesenharTravessia(const void *dados)
     // Barra de informações no topo.
     DrawRectangle(0, 0, LARGURA, 40, Fade(BLACK, 0.6f));
     DrawText("TRAVESSIA", 16, 10, 22, corJogador);
-    textoCentralizado(TextFormat("PISTAS %d / %d", sessao->maiorLinha, META_PISTAS), 10, 22, RAYWHITE);
+    if (sessao->infinito)
+        textoCentralizado(TextFormat("PISTAS %d", sessao->maiorLinha), 10, 22, RAYWHITE);
+    else
+        textoCentralizado(TextFormat("PISTAS %d / %d", sessao->maiorLinha, META_PISTAS), 10, 22, RAYWHITE);
     for (int i = 0; i < VIDAS_INICIAIS; i++)
         DrawCircle(LARGURA - 30 - i * 28, 20, 9, i < sessao->vidas ? (Color){226, 80, 90, 255} : DARKGRAY);
 
@@ -584,9 +589,10 @@ int main(void)
         if (resultado != MINIGAME_EM_CURSO)
         {
             DrawRectangle(0, 0, LARGURA, ALTURA, Fade(BLACK, 0.6f));
-            textoCentralizado(resultado == MINIGAME_VITORIA ? "VOCÊ ATRAVESSOU!" : "FIM DE JOGO", 230, 44,
-                              resultado == MINIGAME_VITORIA ? corJogador : RAYWHITE);
-            textoCentralizado("R para jogar de novo  |  ESC para sair", 300, 20, RAYWHITE);
+            const SessaoTravessia *s = sessao;
+            textoCentralizado("FIM DE JOGO", 200, 44, corJogador);
+            textoCentralizado(TextFormat("Você avançou %d pistas", s->maiorLinha), 258, 24, RAYWHITE);
+            textoCentralizado("R para jogar de novo  |  ESC para sair", 310, 20, RAYWHITE);
         }
         EndDrawing();
     }

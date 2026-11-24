@@ -218,7 +218,8 @@ static void desenharInstrucoes(Desafios *desafios, Jogo *jogo)
     {
         textoCentralizado("Use as setas ou WASD para pular de casa em casa.", 146, 19, COR_CLARO);
         textoCentralizado("Desvie dos carros e não fique para trás: você tem 3 vidas.", 179, 19, COR_CLARO);
-        textoCentralizado("Avance 25 pistas para completar a travessia.", 224, 20, COR_DOURADO);
+        textoCentralizado(jogo ? "Avance 25 pistas para completar a travessia." :
+                          "Treino infinito: vá o mais longe que conseguir.", 224, 20, COR_DOURADO);
         if (jogo)
             textoCentralizado("Recompensa: uma segunda chance nesta pergunta.", 268, 18, COR_CLARO);
     }
