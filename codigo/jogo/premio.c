@@ -10,7 +10,7 @@
  */
 #include "premio.h"
 
-static const int valoresRodadas[TOTAL_RODADAS] = {
+const int valoresRodadas[TOTAL_RODADAS] = {
     1000, 2000, 5000,
     10000, 15000, 20000,
     30000, 40000, 50000,

@@ -19,7 +19,7 @@
 enum { CAPACIDADE_INICIAL = 5 };
 
 // Os ponteiros antigos só são trocados se houver espaço para os dois novos vetores.
-static bool redimensionarBanco(BancoPerguntas *banco, int capacidade)
+bool redimensionarBanco(BancoPerguntas *banco, int capacidade)
 {
     if (capacidade < banco->quantidade || (size_t)capacidade > SIZE_MAX / sizeof(Pergunta))
         return false;
@@ -32,10 +32,10 @@ static bool redimensionarBanco(BancoPerguntas *banco, int capacidade)
         free(usadas);
         return false;
     }
-    if (banco->quantidade > 0)
+    for (int i = 0; i < banco->quantidade; i++)
     {
-        memcpy(perguntas, banco->perguntas, (size_t)banco->quantidade * sizeof *perguntas);
-        memcpy(usadas, banco->usadas, (size_t)banco->quantidade * sizeof *usadas);
+        perguntas[i] = banco->perguntas[i];
+        usadas[i] = banco->usadas[i];
     }
     free(banco->perguntas);
     free(banco->usadas);
@@ -47,33 +47,21 @@ static bool redimensionarBanco(BancoPerguntas *banco, int capacidade)
 
 int inicializaBanco(BancoPerguntas *banco)
 {
-    // O banco começa vazio, com espaço para as primeiras cinco perguntas.
-    banco->quantidade = 0;
-    banco->capacidade = CAPACIDADE_INICIAL;
-    banco->perguntas = calloc(CAPACIDADE_INICIAL, sizeof *banco->perguntas);
-    banco->usadas = calloc(CAPACIDADE_INICIAL, sizeof *banco->usadas);
-    if (banco->perguntas == NULL || banco->usadas == NULL)
-    {
-        liberaBancoPergunta(banco);
-        return 0;
-    }
-    return 1;
+    *banco = (BancoPerguntas){0};
+    return redimensionarBanco(banco, CAPACIDADE_INICIAL);
 }
 
 void liberaBancoPergunta(BancoPerguntas *banco)
 {
     free(banco->perguntas);
     free(banco->usadas);
-    banco->perguntas = NULL;
-    banco->usadas = NULL;
-    banco->quantidade = 0;
-    banco->capacidade = 0;
+    *banco = (BancoPerguntas){0};
 }
 
 // Um texto é válido se termina dentro do limite, não está vazio e não tem aspas
 // (que quebrariam o CSV) nem caracteres de controle como Enter e Tab (códigos abaixo de 32).
 // Letras acentuadas são aceitas como estão.
-static bool textoValido(const char *texto)
+bool textoValido(const char *texto)
 {
     bool temConteudo = false;
     for (int i = 0; i <= LIMITE_TEXTO_PERGUNTA; i++)
@@ -118,22 +106,6 @@ bool perguntasIguais(const Pergunta *a, const Pergunta *b)
             return false;
     }
     return true;
-}
-
-bool perguntaContem(const Pergunta *pergunta, const char *trecho)
-{
-    return strstr(pergunta->conteudo_da_pergunta, trecho) != NULL;
-}
-
-// Um enunciado já usado fica bloqueado mesmo se aparecer em outra categoria ou nível.
-static bool enunciadoJaUsado(const BancoPerguntas *banco, const char *enunciado)
-{
-    for (int i = 0; i < banco->quantidade; i++)
-    {
-        if (banco->usadas[i] && strcmp(banco->perguntas[i].conteudo_da_pergunta, enunciado) == 0)
-            return true;
-    }
-    return false;
 }
 
 int contaPerguntasDistintas(const BancoPerguntas *banco, Dificuldade dificuldade)
@@ -183,14 +155,9 @@ int adicionaPerguntas(BancoPerguntas *banco, const Pergunta *pergunta)
     return 1;
 }
 
-static bool indiceValido(const BancoPerguntas *banco, int indice)
-{
-    return indice >= 0 && indice < banco->quantidade;
-}
-
 bool editarPerguntaPorIndice(BancoPerguntas *banco, int indice, const Pergunta *pergunta)
 {
-    if (!indiceValido(banco, indice) || validarPergunta(pergunta))
+    if (indice < 0 || indice >= banco->quantidade || validarPergunta(pergunta))
         return false;
     banco->perguntas[indice] = *pergunta;
     banco->usadas[indice] = false;
@@ -199,7 +166,7 @@ bool editarPerguntaPorIndice(BancoPerguntas *banco, int indice, const Pergunta *
 
 bool excluirPerguntaPorIndice(BancoPerguntas *banco, int indice)
 {
-    if (!indiceValido(banco, indice))
+    if (indice < 0 || indice >= banco->quantidade)
         return false;
 
     for (int i = indice; i < banco->quantidade - 1; i++)
@@ -214,13 +181,18 @@ bool excluirPerguntaPorIndice(BancoPerguntas *banco, int indice)
     return true;
 }
 
-static bool perguntaDisponivel(const BancoPerguntas *banco, int indice,
+bool perguntaDisponivel(const BancoPerguntas *banco, int indice,
                                Dificuldade dificuldade, Categoria categoria)
 {
     const Pergunta *pergunta = &banco->perguntas[indice];
     if (banco->usadas[indice] || pergunta->dificuldades != dificuldade || pergunta->categorias != categoria)
         return false;
-    return !enunciadoJaUsado(banco, pergunta->conteudo_da_pergunta);
+    // O enunciado fica bloqueado mesmo se houver uma cópia em outra categoria.
+    for (int i = 0; i < banco->quantidade; i++)
+        if (banco->usadas[i] &&
+            strcmp(banco->perguntas[i].conteudo_da_pergunta, pergunta->conteudo_da_pergunta) == 0)
+            return false;
+    return true;
 }
 
 int contaPerguntasDisponiveis(const BancoPerguntas *banco, Dificuldade dificuldade, Categoria categoria)
@@ -256,52 +228,42 @@ int sorteaPergunta(BancoPerguntas *banco, Dificuldade dificuldade, Categoria cat
     return -1;
 }
 
-static const char cabecalhoCsv[] =
+const char cabecalhoCsv[] =
     "enunciado,alternativa_A,alternativa_B,alternativa_C,alternativa_D,alternativa_correta,dificuldade,categoria";
 
-// Lê um campo a partir da posição atual e deixa o cursor na vírgula seguinte.
-static bool lerString(const char *texto, int *posicao, char *destino)
+// O campo termina na vírgula, ou nas aspas quando contém vírgulas próprias.
+bool lerCampoCsv(const char *texto, int *posicao, char *destino)
 {
     int i = *posicao;
-    int j = 0;
+    char separador = ',';
     if (texto[i] == '"')
     {
-        i++;
-        while (texto[i] != '"')
-        {
-            if (texto[i] == '\0' || texto[i] == '\r' || texto[i] == '\n' || j == LIMITE_TEXTO_PERGUNTA)
-                return false;
-            destino[j++] = texto[i++];
-        }
+        separador = '"';
         i++;
     }
-    else
-    {
-        while (j < LIMITE_TEXTO_PERGUNTA && texto[i] != '\0' &&
-               texto[i] != '\r' && texto[i] != '\n' && texto[i] != ',')
-            destino[j++] = texto[i++];
-    }
-
-    if (j == 0 || texto[i] != ',')
+    int tamanho = 0;
+    while (tamanho < LIMITE_TEXTO_PERGUNTA && texto[i] != separador &&
+           texto[i] && texto[i] != '\n' && texto[i] != '\r')
+        destino[tamanho++] = texto[i++];
+    if (tamanho == 0 || texto[i] != separador)
         return false;
-    destino[j] = '\0';
-    *posicao = i;
+    if (separador == '"')
+        i++;
+    if (texto[i] != ',')
+        return false;
+    destino[tamanho] = '\0';
+    *posicao = i + 1;
     return true;
 }
 
-static bool lerRegistroCsv(const char *linha, Pergunta *pergunta)
+bool lerRegistroCsv(const char *linha, Pergunta *pergunta)
 {
     int posicao = 0;
-    if (!lerString(linha, &posicao, pergunta->conteudo_da_pergunta))
+    if (!lerCampoCsv(linha, &posicao, pergunta->conteudo_da_pergunta))
         return false;
     for (int i = 0; i < 4; i++)
-    {
-        posicao++; // Pula a vírgula que separa a alternativa do campo anterior.
-        if (!lerString(linha, &posicao, pergunta->alternativas[i]))
+        if (!lerCampoCsv(linha, &posicao, pergunta->alternativas[i]))
             return false;
-    }
-
-    posicao++;
     char correta = (char)toupper((unsigned char)linha[posicao]);
     if (correta < 'A' || correta > 'D' || linha[posicao + 1] != ',')
         return false;
@@ -330,7 +292,7 @@ static bool lerRegistroCsv(const char *linha, Pergunta *pergunta)
     return true;
 }
 
-static int concluirLeitura(BancoPerguntas *banco, BancoPerguntas *novo, bool ok)
+int concluirLeitura(BancoPerguntas *banco, BancoPerguntas *novo, bool ok)
 {
     if (!ok)
     {
@@ -342,7 +304,7 @@ static int concluirLeitura(BancoPerguntas *banco, BancoPerguntas *novo, bool ok)
     return 1;
 }
 
-static int lerLinhaCsv(FILE *arq, char *linha, size_t capacidade)
+int lerLinhaCsv(FILE *arq, char *linha, size_t capacidade)
 {
     size_t tamanho = 0;
     int c;
@@ -365,17 +327,12 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq)
     if (!arq)
         return 0;
     BancoPerguntas novo;
-    bool ok = inicializaBanco(&novo);
     char linha[1200] = {0};
+    bool ok = inicializaBanco(&novo) && lerLinhaCsv(arq, linha, sizeof linha) > 0;
     if (ok)
     {
-        // A primeira linha precisa ser o cabeçalho esperado.
-        ok = lerLinhaCsv(arq, linha, sizeof linha) > 0;
-        if (ok)
-        {
-            linha[strcspn(linha, "\r\n")] = '\0';
-            ok = strcmp(linha, cabecalhoCsv) == 0;
-        }
+        linha[strcspn(linha, "\r\n")] = '\0';
+        ok = strcmp(linha, cabecalhoCsv) == 0;
     }
 
     int lida = 0;
@@ -399,12 +356,10 @@ int carregaBinario(BancoPerguntas *banco, const char *nome_arq)
     FILE *arq = fopen(nome_arq, "rb");
     if (!arq)
         return 0;
-    BancoPerguntas novo; // Só substitui o banco do chamador se todo o DAT for válido.
-    bool ok = inicializaBanco(&novo);
+    BancoPerguntas novo = {0};
     int quantidade = -1;
-    if (ok)
-        ok = fread(&quantidade, sizeof quantidade, 1, arq) == 1 && quantidade >= 0 &&
-             fseek(arq, 0, SEEK_END) == 0;
+    bool ok = fread(&quantidade, sizeof quantidade, 1, arq) == 1 && quantidade >= 0 &&
+              fseek(arq, 0, SEEK_END) == 0;
     if (ok)
     {
         long tamanho = ftell(arq);
@@ -414,16 +369,8 @@ int carregaBinario(BancoPerguntas *banco, const char *nome_arq)
              dados / (long)sizeof(Pergunta) == quantidade &&
              fseek(arq, (long)sizeof quantidade, SEEK_SET) == 0;
     }
-    if (ok && quantidade > novo.capacidade)
-    {
-        int novaCapacidade = novo.capacidade;
-        // Cresce em blocos como no carregamento original, protegendo a multiplicação.
-        while (novaCapacidade < quantidade && novaCapacidade <= INT_MAX / 2)
-            novaCapacidade *= 2;
-        if (novaCapacidade < quantidade)
-            novaCapacidade = quantidade;
-        ok = redimensionarBanco(&novo, novaCapacidade);
-    }
+    if (ok)
+        ok = redimensionarBanco(&novo, quantidade > CAPACIDADE_INICIAL ? quantidade : CAPACIDADE_INICIAL);
     if (ok)
     {
         ok = fread(novo.perguntas, sizeof(Pergunta), (size_t)quantidade, arq) == (size_t)quantidade;
@@ -465,7 +412,7 @@ int salvaBinario(const BancoPerguntas *banco, const char *nome_arq)
 }
 
 // A partir daqui ficam as operações que pedem dados ou imprimem no terminal.
-static int lerLinhaTerminal(char *texto, size_t capacidade)
+int lerLinhaTerminal(char *texto, size_t capacidade)
 {
     if (!fgets(texto, (int)capacidade, stdin))
         return 0;
@@ -480,7 +427,7 @@ static int lerLinhaTerminal(char *texto, size_t capacidade)
     return 1;
 }
 
-static bool lerTextoTerminal(const char *rotulo, char *destino)
+bool lerTextoTerminal(const char *rotulo, char *destino)
 {
     char texto[LIMITE_TEXTO_PERGUNTA + 3];
     for (;;)
@@ -505,7 +452,7 @@ static bool lerTextoTerminal(const char *rotulo, char *destino)
     }
 }
 
-static int lerNumeroTerminal(const char *rotulo, int minimo, int maximo, bool repetir)
+int lerNumeroTerminal(const char *rotulo, int minimo, int maximo, bool repetir)
 {
     char linha[48];
     do
@@ -530,17 +477,17 @@ static int lerNumeroTerminal(const char *rotulo, int minimo, int maximo, bool re
 
 const char *nomeCategoria(Categoria categoria)
 {
-    static const char *const nomes[] = {"Geek", "Esportes", "Matemática", "Geografia", "Biologia"};
+    const char *const nomes[] = {"Geek", "Esportes", "Matemática", "Geografia", "Biologia"};
     return categoria >= GEEK && categoria <= BIOLOGIA ? nomes[categoria - GEEK] : "";
 }
 
 const char *nomeDificuldade(Dificuldade dificuldade)
 {
-    static const char *const nomes[] = {"Muito fácil", "Fácil", "Médio", "Difícil", "Impossível"};
+    const char *const nomes[] = {"Muito fácil", "Fácil", "Médio", "Difícil", "Impossível"};
     return dificuldade >= MUITO_FACIL && dificuldade <= IMPOSSIVEL ? nomes[dificuldade - MUITO_FACIL] : "";
 }
 
-static int lerCamposPergunta(Pergunta *pergunta, bool editando)
+int lerPergunta(Pergunta *pergunta, bool editando)
 {
     Pergunta nova = {0};
     const char *enunciado = editando ? "Digite o novo enunciado da questão" : "Digite o enunciado da questão";
@@ -584,12 +531,7 @@ static int lerCamposPergunta(Pergunta *pergunta, bool editando)
     return 1;
 }
 
-int lerPergunta(Pergunta *pergunta)
-{
-    return lerCamposPergunta(pergunta, false);
-}
-
-static void imprimirPergunta(const BancoPerguntas *banco, int indice)
+void imprimirPergunta(const BancoPerguntas *banco, int indice)
 {
     const Pergunta *p = &banco->perguntas[indice];
     printf("====== Pergunta %d ======\n%s\n", indice + 1, p->conteudo_da_pergunta);
@@ -629,7 +571,7 @@ int pesquisaPergunta(BancoPerguntas *banco)
     int encontradas = 0;
     for (int i = 0; i < banco->quantidade; i++)
     {
-        if (perguntaContem(&banco->perguntas[i], texto))
+        if (strstr(banco->perguntas[i].conteudo_da_pergunta, texto))
         {
             imprimirPergunta(banco, i);
             encontradas++;
@@ -660,5 +602,5 @@ int alteraPergunta(BancoPerguntas *banco)
     }
     int numero = lerNumeroTerminal("Digite o número da pergunta (0 cancela)", 0, banco->quantidade, false);
     Pergunta nova;
-    return numero > 0 && lerCamposPergunta(&nova, true) && editarPerguntaPorIndice(banco, numero - 1, &nova);
+    return numero > 0 && lerPergunta(&nova, true) && editarPerguntaPorIndice(banco, numero - 1, &nova);
 }

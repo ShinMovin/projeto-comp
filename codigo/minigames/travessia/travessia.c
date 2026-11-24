@@ -25,16 +25,16 @@
 #define LINHA_JOGADOR_TELA 3
 #define FOLGA_CARRO 6.0f                   // pixels de cada ponta do carro que não contam como batida               // a câmera tenta manter o jogador 3 pistas acima do fundo
 
-static const Color corGramaClara = {86, 150, 78, 255};
-static const Color corGramaEscura = {74, 136, 68, 255};
-static const Color corRua = {52, 56, 66, 255};
-static const Color corFaixa = {214, 214, 200, 255};
-static const Color corJogador = {207, 166, 78, 255};
-static const Color corAgua = {46, 102, 168, 255};
-static const Color corTronco = {124, 84, 48, 255};
-static const Color corBrita = {104, 96, 88, 255};
-static const Color corTrem = {176, 42, 52, 255};
-static const Color coresCarro[] = {
+const Color corGramaClara = {86, 150, 78, 255};
+const Color corGramaEscura = {74, 136, 68, 255};
+const Color corRua = {52, 56, 66, 255};
+const Color corFaixa = {214, 214, 200, 255};
+const Color corJogador = {207, 166, 78, 255};
+const Color corAgua = {46, 102, 168, 255};
+const Color corTronco = {124, 84, 48, 255};
+const Color corBrita = {104, 96, 88, 255};
+const Color corTrem = {176, 42, 52, 255};
+const Color coresCarro[] = {
     {196, 70, 70, 255}, {70, 120, 196, 255}, {226, 182, 60, 255}, {150, 90, 190, 255}, {235, 235, 235, 255}
 };
 
@@ -74,19 +74,9 @@ struct SessaoTravessia
 /* ---------- Mapa ---------- */
 
 // O mapa é infinito, mas só BUFFER_PISTAS ficam na memória: a linha L mora no índice L % BUFFER_PISTAS.
-static Pista *pista(SessaoTravessia *sessao, int linha)
+void gerarPista(SessaoTravessia *sessao, int linha)
 {
-    return &sessao->pistas[linha % BUFFER_PISTAS];
-}
-
-static const Pista *pistaConst(const SessaoTravessia *sessao, int linha)
-{
-    return &sessao->pistas[linha % BUFFER_PISTAS];
-}
-
-static void gerarPista(SessaoTravessia *sessao, int linha)
-{
-    Pista *p = pista(sessao, linha);
+    Pista *p = &sessao->pistas[linha % BUFFER_PISTAS];
     *p = (Pista){.linha = linha, .tipo = PISTA_GRAMA};
 
     // As primeiras pistas e a chegada são grama livre, para o jogador começar e terminar em paz.
@@ -96,7 +86,7 @@ static void gerarPista(SessaoTravessia *sessao, int linha)
     {
         p->tipo = PISTA_RIO;
         // Dois rios seguidos correm em sentidos opostos, para obrigar a trocar de tronco com atenção.
-        const Pista *anterior = pista(sessao, linha - 1);
+        const Pista *anterior = &sessao->pistas[(linha - 1) % BUFFER_PISTAS];
         int direcao = anterior->linha == linha - 1 && anterior->tipo == PISTA_RIO ?
                       (anterior->velocidade > 0 ? -1 : 1) : (rand() % 2 ? 1 : -1);
         p->velocidade = direcao * (float)(60 + rand() % 50 + linha * 2);
@@ -142,25 +132,25 @@ static void gerarPista(SessaoTravessia *sessao, int linha)
 }
 
 // Gera as pistas que vão aparecer na tela e ainda não existem no buffer.
-static void garantirPistas(SessaoTravessia *sessao)
+void garantirPistas(SessaoTravessia *sessao)
 {
     int primeira = (int)sessao->camera;
     for (int linha = primeira; linha <= primeira + LINHAS_VISIVEIS + 1; linha++)
     {
-        if (pista(sessao, linha)->linha != linha)
+        if (sessao->pistas[linha % BUFFER_PISTAS].linha != linha)
             gerarPista(sessao, linha);
     }
 }
 
-static bool casaLivre(SessaoTravessia *sessao, int coluna, int linha)
+bool casaLivre(SessaoTravessia *sessao, int coluna, int linha)
 {
-    const Pista *p = pista(sessao, linha);
+    const Pista *p = &sessao->pistas[linha % BUFFER_PISTAS];
     return coluna >= 0 && coluna < COLUNAS && !(p->tipo == PISTA_GRAMA && p->arvores[coluna]);
 }
 
 /* ---------- Regras ---------- */
 
-static void perderVida(SessaoTravessia *sessao, bool ficouParaTras)
+void perderVida(SessaoTravessia *sessao, bool ficouParaTras)
 {
     sessao->vidas--;
     if (sessao->vidas <= 0)
@@ -184,7 +174,7 @@ static void perderVida(SessaoTravessia *sessao, bool ficouParaTras)
     sessao->linha = (int)ceilf(sessao->camera) + 1;
     garantirPistas(sessao);
     // Não renasce dentro do rio.
-    while (pista(sessao, sessao->linha)->tipo == PISTA_RIO && sessao->linha < (int)sessao->camera + LINHAS_VISIVEIS - 2)
+    while (sessao->pistas[sessao->linha % BUFFER_PISTAS].tipo == PISTA_RIO && sessao->linha < (int)sessao->camera + LINHAS_VISIVEIS - 2)
         sessao->linha++;
     for (int d = 0; d < COLUNAS && !casaLivre(sessao, sessao->coluna, sessao->linha); d++)
         sessao->coluna = (sessao->coluna + 1) % COLUNAS;
@@ -194,7 +184,7 @@ static void perderVida(SessaoTravessia *sessao, bool ficouParaTras)
 }
 
 // Ciclo do trilho: espera -> (luz piscando no último segundo) -> trem atravessa -> espera de novo.
-static void moverTrem(Pista *p, float dt)
+void moverTrem(Pista *p, float dt)
 {
     if (!p->tremPassando)
     {
@@ -216,7 +206,7 @@ static void moverTrem(Pista *p, float dt)
     }
 }
 
-static void moverCarros(SessaoTravessia *sessao, float dt)
+void moverCarros(SessaoTravessia *sessao, float dt)
 {
     const float trecho = LARGURA + 200.0f;
     for (int i = 0; i < BUFFER_PISTAS; i++)
@@ -241,7 +231,7 @@ static void moverCarros(SessaoTravessia *sessao, float dt)
     }
 }
 
-static void lerMovimento(SessaoTravessia *sessao)
+void lerMovimento(SessaoTravessia *sessao)
 {
     int dc = 0, dl = 0;
     if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W))
@@ -277,9 +267,9 @@ static void lerMovimento(SessaoTravessia *sessao)
     sessao->pulo = DURACAO_PULO;
 }
 
-static bool atropelado(SessaoTravessia *sessao)
+bool atropelado(SessaoTravessia *sessao)
 {
-    const Pista *p = pista(sessao, sessao->linha);
+    const Pista *p = &sessao->pistas[sessao->linha % BUFFER_PISTAS];
     if (p->tipo != PISTA_RUA && p->tipo != PISTA_TRILHO)
         return false;
     // Na primeira metade do pulo o personagem ainda está saindo da pista anterior: não conta.
@@ -299,9 +289,9 @@ static bool atropelado(SessaoTravessia *sessao)
 
 // No rio: se está sobre um tronco, é carregado junto; se não, afoga.
 // Devolve true se o jogador caiu na água ou foi levado para fora da tela.
-static bool levarPeloRio(SessaoTravessia *sessao, float dt)
+bool levarPeloRio(SessaoTravessia *sessao, float dt)
 {
-    const Pista *p = pista(sessao, sessao->linha);
+    const Pista *p = &sessao->pistas[sessao->linha % BUFFER_PISTAS];
     if (p->tipo != PISTA_RIO || sessao->pulo > 0.0f)
         return false;
 
@@ -363,7 +353,7 @@ ResultadoMinigame AtualizarTravessia(SessaoTravessia *sessao, float dt)
 
     if (sessao->linha > sessao->maiorLinha)
         sessao->maiorLinha = sessao->linha;
-    if (sessao->pulo <= 0.0f && pista(sessao, sessao->linha)->tipo == PISTA_GRAMA)
+    if (sessao->pulo <= 0.0f && sessao->pistas[sessao->linha % BUFFER_PISTAS].tipo == PISTA_GRAMA)
     {
         sessao->colunaSegura = sessao->coluna;
         sessao->linhaSegura = sessao->linha;
@@ -396,20 +386,20 @@ ResultadoMinigame AtualizarTravessia(SessaoTravessia *sessao, float dt)
 /* ---------- Desenho ---------- */
 
 // Converte uma linha do mapa (pode ter fração) no y do topo dela na tela.
-static float telaY(const SessaoTravessia *sessao, float linha)
+float telaY(const SessaoTravessia *sessao, float linha)
 {
     return ALTURA - (linha - sessao->camera + 1.0f) * CELULA;
 }
 
-static void desenharPista(const SessaoTravessia *sessao, int linha)
+void desenharPista(const SessaoTravessia *sessao, int linha)
 {
-    const Pista *p = pistaConst(sessao, linha);
+    const Pista *p = &sessao->pistas[linha % BUFFER_PISTAS];
     float y = telaY(sessao, (float)linha);
     if (p->tipo == PISTA_RUA)
     {
         DrawRectangle(0, (int)y, LARGURA, CELULA, corRua);
         // Faixa tracejada entre duas ruas seguidas.
-        if (pistaConst(sessao, linha + 1)->tipo == PISTA_RUA)
+        if (sessao->pistas[(linha + 1) % BUFFER_PISTAS].tipo == PISTA_RUA)
             for (int x = 10; x < LARGURA; x += 60)
                 DrawRectangle(x, (int)y - 2, 30, 4, corFaixa);
         for (int c = 0; c < p->quantidadeCarros; c++)
@@ -497,7 +487,7 @@ static void desenharPista(const SessaoTravessia *sessao, int linha)
     }
 }
 
-static void desenharJogador(const SessaoTravessia *sessao)
+void desenharJogador(const SessaoTravessia *sessao)
 {
     // Pisca enquanto está invencível.
     if (sessao->invencivel > 0.0f && fmodf(sessao->invencivel, 0.2f) < 0.1f)

@@ -19,60 +19,30 @@
 #include "premio.h"
 #include "roleta.h"
 
-static const char *caminhoDados(const char *arquivo)
-{
-    return TextFormat("%s../dados/%s", GetApplicationDirectory(), arquivo);
-}
-
 // Dados da partida e das telas que a acompanham. O banco é compartilhado com o editor.
 typedef struct
 {
     Jogo jogo;
     Roleta roleta;
     const char *avisoRoleta;
-    RoletaDificuldade roletaDificuldade;
-    bool naRoletaDificuldade; // A tela da roleta de dificuldade está aberta por cima da de categorias.
     Desafios ajudas;
 } PartidaGrafica;
 
-static void prepararRoleta(PartidaGrafica *partida, const BancoPerguntas *banco)
+void prepararRoleta(PartidaGrafica *partida, const BancoPerguntas *banco)
 {
     iniciarRoleta(&partida->roleta, banco, partida->jogo.dificuldade, categoriaBloqueada(&partida->jogo));
-    partida->avisoRoleta = banco ? NULL : "Não foi possível abrir o banco de perguntas.";
-    partida->naRoletaDificuldade = false;
+    partida->avisoRoleta = NULL;
 }
 
-static void desenharEtapaDificuldade(PartidaGrafica *partida, const BancoPerguntas *banco)
-{
-    RoletaDificuldade *roleta = &partida->roletaDificuldade;
-    AcaoRoleta acao = desenharRoletaDificuldade(roleta);
-    if (acao == ROLETA_VOLTAR)
-        partida->naRoletaDificuldade = false;
-    else if (acao == ROLETA_GIRAR)
-        girarRoletaDificuldade(roleta);
-    else if (acao == ROLETA_PROSSEGUIR)
-    {
-        aplicarDificuldade(&partida->jogo, variacaoDificuldade(roleta));
-        // A roleta de categorias é refeita para considerar as perguntas do novo nível.
-        prepararRoleta(partida, banco);
-    }
-}
-
-static void iniciarPartida(PartidaGrafica *partida, BancoPerguntas *banco)
+void iniciarPartida(PartidaGrafica *partida, BancoPerguntas *banco)
 {
     iniciarJogo(&partida->jogo, banco);
     liberarDesafios(&partida->ajudas);
     prepararRoleta(partida, banco);
 }
 
-static void avancarPartida(PartidaGrafica *partida, const BancoPerguntas *banco)
-{
-    if (avancarRodada(&partida->jogo) && partida->jogo.estado == SORTEA)
-        prepararRoleta(partida, banco);
-}
-
 // Atualiza só o que está visível. Durante uma ajuda, o relógio da pergunta fica parado.
-static void atualizarPartida(PartidaGrafica *partida, const BancoPerguntas *banco, float segundos)
+void atualizarPartida(PartidaGrafica *partida, const BancoPerguntas *banco, float segundos)
 {
     Jogo *jogo = &partida->jogo;
     if (partida->ajudas.tela != DESAFIOS_FECHADOS)
@@ -84,16 +54,11 @@ static void atualizarPartida(PartidaGrafica *partida, const BancoPerguntas *banc
 
     atualizarJogo(jogo, banco, segundos);
     if (jogo->estado == SORTEA)
-    {
-        if (partida->naRoletaDificuldade)
-            atualizarRoletaDificuldade(&partida->roletaDificuldade, segundos);
-        else
-            atualizarRoleta(&partida->roleta, segundos);
-    }
+        atualizarRoleta(&partida->roleta, segundos);
 }
 
 // Desenha o estado atual e devolve a tela que o loop deve mostrar no próximo quadro.
-static Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
+Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
 {
     Jogo *jogo = &partida->jogo;
     if (partida->ajudas.tela != DESAFIOS_FECHADOS)
@@ -101,7 +66,8 @@ static Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
         if (desenharDesafios(&partida->ajudas, jogo))
         {
             liberarDesafios(&partida->ajudas);
-            avancarPartida(partida, banco);
+            if (avancarRodada(jogo) && jogo->estado == SORTEA)
+                prepararRoleta(partida, banco);
         }
         return TELA_JOGAR;
     }
@@ -119,24 +85,29 @@ static Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
 
     case SORTEA:
     {
-        if (partida->naRoletaDificuldade)
+        Roleta *roleta = &partida->roleta;
+        AcaoRoleta acao = desenharRoleta(roleta, partida->avisoRoleta, jogo->dificuldade,
+                                        podeGirarDificuldade(jogo));
+        if (acao == ROLETA_VOLTAR || (!roleta->deDificuldade && IsKeyPressed(KEY_BACKSPACE)))
         {
-            desenharEtapaDificuldade(partida, banco);
-            return TELA_JOGAR;
+            if (!roleta->deDificuldade)
+                return MENU_PRINCIPAL;
+            prepararRoleta(partida, banco);
         }
-        AcaoRoleta acao = desenharRoleta(&partida->roleta, partida->avisoRoleta, jogo->dificuldade,
-                                         podeGirarDificuldade(jogo));
-        if (acao == ROLETA_VOLTAR || IsKeyPressed(KEY_BACKSPACE))
-            return MENU_PRINCIPAL;
-        if (acao == ROLETA_DIFICULDADE)
-        {
-            iniciarRoletaDificuldade(&partida->roletaDificuldade, banco, jogo->rodada);
-            partida->naRoletaDificuldade = true;
-        }
+        else if (acao == ROLETA_DIFICULDADE)
+            iniciarRoletaDificuldade(roleta, banco, jogo->rodada);
         else if (acao == ROLETA_GIRAR)
-            girarRoleta(&partida->roleta);
-        else if (acao == ROLETA_PROSSEGUIR && !selecionarPergunta(jogo, banco, partida->roleta.categoria))
-            partida->avisoRoleta = "Sem perguntas inéditas no setor sorteado.";
+            girarRoleta(roleta);
+        else if (acao == ROLETA_PROSSEGUIR)
+        {
+            if (roleta->deDificuldade)
+            {
+                aplicarDificuldade(jogo, roleta->resultado - DIF_MANTER);
+                prepararRoleta(partida, banco);
+            }
+            else if (!selecionarPergunta(jogo, banco, (Categoria)(GEEK + roleta->resultado)))
+                partida->avisoRoleta = "Sem perguntas inéditas no setor sorteado.";
+        }
         return TELA_JOGAR;
     }
 
@@ -171,7 +142,8 @@ static Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
         abrirDesafios(&partida->ajudas);
         break;
     case PERGUNTA_AVANCAR:
-        avancarPartida(partida, banco);
+        if (avancarRodada(jogo) && jogo->estado == SORTEA)
+            prepararRoleta(partida, banco);
         break;
     case PERGUNTA_SEM_ACAO:
         break;
@@ -180,7 +152,7 @@ static Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
 }
 
 // Quando chamado pelo terminal, o banco já está aberto e a trava continua com o terminal.
-static void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool travaTerminal)
+void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool travaTerminal)
 {
     InitWindow(800, 600, "Jogo do Milhão");
     SetTargetFPS(60);
@@ -290,7 +262,7 @@ static void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool tra
     CloseWindow();
 }
 
-static bool salvarTerminal(ArquivosBanco *arquivos, BancoPerguntas *banco)
+bool salvarTerminal(ArquivosBanco *arquivos, BancoPerguntas *banco)
 {
     const char *erro = salvarBancoArquivos(arquivos, banco);
     if (erro)
@@ -309,7 +281,7 @@ static bool salvarTerminal(ArquivosBanco *arquivos, BancoPerguntas *banco)
     return true;
 }
 
-static void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
+void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
 {
     if (arquivos->somenteLeitura)
         puts("Um arquivo está inválido ou ilegível. Banco aberto para consulta.");
@@ -346,7 +318,7 @@ static void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
         case 2:
         {
             Pergunta nova;
-            if (lerPergunta(&nova))
+            if (lerPergunta(&nova, false))
             {
                 mudou = adicionaPerguntas(banco, &nova);
                 if (!mudou)
@@ -368,7 +340,7 @@ static void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
             break;
 
         case 6:
-            if(salvaPergunta(banco, caminhoDados("perguntas_exportadas.csv")) == 1)
+            if (salvaPergunta(banco, TextFormat("%s../dados/perguntas_exportadas.csv", GetApplicationDirectory())))
             {
                 printf("Perguntas exportadas para dados/perguntas_exportadas.csv\n");
             }
@@ -398,7 +370,7 @@ int main(int argc, char **argv)
     BancoPerguntas banco = {0};
     ArquivosBanco arquivos;
     srand((unsigned int)time(NULL));
-    if (!inicializarArquivosBanco(&arquivos, caminhoDados("")))
+    if (!inicializarArquivosBanco(&arquivos, TextFormat("%s../dados", GetApplicationDirectory())))
         return 1;
 
     bool terminal = argc > 1 && strcmp(argv[1], "--banco") == 0;

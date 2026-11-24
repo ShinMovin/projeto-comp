@@ -12,10 +12,10 @@
 #include "premio.h"
 #include <stdlib.h>
 
-static const float duracaoSuspense = 1.15f;
-static const float duracaoRevelacao = 1.55f;
+const float duracaoSuspense = 1.15f;
+const float duracaoRevelacao = 1.55f;
 
-static void conquistarRodada(Jogo *jogo)
+void conquistarRodada(Jogo *jogo)
 {
     // Diminuir não tira nada; aumentar soma um bônus que acompanha o prêmio até o fim.
     jogo->bonus += bonusDificuldade(jogo->rodada, dificuldadeRodada(jogo->rodada), jogo->dificuldade);
@@ -89,7 +89,7 @@ void confirmarResposta(Jogo *jogo)
     }
 }
 
-static void julgarResposta(Jogo *jogo, const Pergunta *pergunta)
+void julgarResposta(Jogo *jogo, const Pergunta *pergunta)
 {
     jogo->tempoEstado = 0.0f;
     if (jogo->resposta == pergunta->alternativa_correta)
@@ -176,7 +176,7 @@ bool iniciarAjuda(Jogo *jogo, TipoMinigame tipo)
     return true;
 }
 
-static bool eliminarIncorretas(Jogo *jogo, const Pergunta *pergunta)
+bool eliminarIncorretas(Jogo *jogo, const Pergunta *pergunta)
 {
     int candidatas[4], total = 0;
     for (int i = 0; i < 4; i++)

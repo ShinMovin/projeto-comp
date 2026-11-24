@@ -4,7 +4,7 @@
 #include <math.h>
 #include <string.h>
 
-static bool botao(const char *texto, Rectangle area, bool dourado)
+bool botao(const char *texto, Rectangle area, bool dourado)
 {
     bool selecionado = CheckCollisionPointRec(GetMousePosition(), area);
     Color cor = selecionado || dourado ? COR_DOURADO : COR_AZUL;
@@ -61,7 +61,7 @@ Tela desenharMenu(void)
     textoCentralizado("MILHAO", 151, 48, COR_DOURADO);
     textoCentralizado("DESAFIE SEU SABER", 222, 15, COR_CLARO);
 
-    static const struct
+    const struct
     {
         const char *rotulo;
         Tela destino;
@@ -87,13 +87,11 @@ Tela desenharMenu(void)
     return proximaTela;
 }
 
-static const Color corAcerto = {112, 224, 163, 255};
-static const Color corErro = {255, 135, 145, 255};
-static const Color corLegenda = {176, 184, 208, 255};
+const Color corAcerto = {112, 224, 163, 255};
+const Color corErro = {255, 135, 145, 255};
+const Color corLegenda = {176, 184, 208, 255};
 
-enum { CAPACIDADE_TEXTO = LIMITE_TEXTO_PERGUNTA + 1 };
-
-static const char *emReais(int valor)
+const char *emReais(int valor)
 {
     if (valor >= 1000000)
         return TextFormat("R$ %d.%03d.%03d", valor / 1000000, valor / 1000 % 1000, valor % 1000);
@@ -102,75 +100,64 @@ static const char *emReais(int valor)
     return TextFormat("R$ %d", valor);
 }
 
-static void textoADireita(const char *texto, int direita, int y, int tamanho, Color cor)
+void textoADireita(const char *texto, int direita, int y, int tamanho, Color cor)
 {
     DrawText(texto, direita - MeasureText(texto, tamanho), y, tamanho, cor);
-}
-
-// Guarda cada linha no mesmo buffer e retorna quantas linhas foram produzidas.
-// "linhas" guarda só os endereços de início, válidos enquanto o buffer existir.
-static int quebrarLinhas(const char *texto, Font fonte, float tamanho, float largura,
-                         char *buffer, const char **linhas)
-{
-    int quantidade = 0;
-    int inicio = 0;
-    while (texto[inicio])
-    {
-        int fim = inicio;
-        int ultimoEspaco = -1;
-        char *linha = buffer;
-        while (texto[fim] && texto[fim] != '\n')
-        {
-            // O índice avança por um caractere inteiro, que pode ocupar vários bytes.
-            int bytes;
-            GetCodepointNext(texto + fim, &bytes);
-            int comprimento = fim - inicio + bytes;
-            memcpy(linha + (fim - inicio), texto + fim, (size_t)bytes);
-            linha[comprimento] = '\0';
-            if (fim > inicio && MeasureTextEx(fonte, linha, tamanho, 1).x > largura)
-                break;
-            if (texto[fim] == ' ' && fim > inicio)
-                ultimoEspaco = fim;
-            fim += bytes;
-        }
-        if (texto[fim] && texto[fim] != '\n' && ultimoEspaco >= 0)
-            fim = ultimoEspaco;
-
-        linha[fim - inicio] = '\0';
-        linhas[quantidade++] = linha;
-        buffer += fim - inicio + 1;
-        inicio = fim;
-        if (texto[inicio] == '\n')
-            inicio++;
-        while (texto[inicio] == ' ')
-            inicio++;
-    }
-    return quantidade;
 }
 
 void desenharTextoPergunta(const char texto[LIMITE_TEXTO_PERGUNTA + 1], Rectangle area,
                            int tamanho, bool centralizar, Color cor)
 {
-    char copia[CAPACIDADE_TEXTO];
-    char buffer[2 * CAPACIDADE_TEXTO];
-    const char *linhas[CAPACIDADE_TEXTO];
-    int bytes = 0;
-    while (bytes < LIMITE_TEXTO_PERGUNTA && texto[bytes])
-    {
-        copia[bytes] = texto[bytes];
-        bytes++;
-    }
-    copia[bytes] = '\0';
-    if (!copia[0])
+    int limite = 0;
+    while (limite < LIMITE_TEXTO_PERGUNTA && texto[limite])
+        limite++;
+    if (limite == 0)
         return;
 
     Font fonte = GetFontDefault();
+    char buffer[2 * (LIMITE_TEXTO_PERGUNTA + 1)];
+    int linhas[LIMITE_TEXTO_PERGUNTA + 1];
     int quantidade;
-    float altura, passo;
-    // Quebra por largura real, preserva o UTF-8 e diminui a fonte se as linhas excederem o cartão.
+    float passo, altura;
+    // Mede cada linha na fonte real. Se o texto não couber, tenta uma fonte menor.
     for (;; tamanho--)
     {
-        quantidade = quebrarLinhas(copia, fonte, tamanho, area.width, buffer, linhas);
+        int inicio = 0;
+        int gravados = 0;
+        quantidade = 0;
+        while (inicio < limite)
+        {
+            linhas[quantidade++] = gravados;
+            int fim = inicio;
+            int ultimoEspaco = -1;
+
+            while (fim < limite && texto[fim] != '\n')
+            {
+                int bytes;
+                GetCodepointNext(texto + fim, &bytes);
+                if (bytes < 1 || bytes > limite - fim)
+                    bytes = 1;
+                int posicao = gravados + fim - inicio;
+                for (int i = 0; i < bytes; i++)
+                    buffer[posicao + i] = texto[fim + i];
+                buffer[posicao + bytes] = '\0';
+                if (fim > inicio && MeasureTextEx(fonte, buffer + gravados, tamanho, 1).x > area.width)
+                    break;
+                if (texto[fim] == ' ' && fim > inicio)
+                    ultimoEspaco = fim;
+                fim += bytes;
+            }
+            if (fim < limite && texto[fim] != '\n' && ultimoEspaco >= 0)
+                fim = ultimoEspaco;
+            gravados += fim - inicio;
+            buffer[gravados++] = '\0';
+            inicio = fim;
+            if (inicio < limite && texto[inicio] == '\n')
+                inicio++;
+            while (inicio < limite && texto[inicio] == ' ')
+                inicio++;
+        }
+
         passo = tamanho + (tamanho >= 15 ? 3 : 1);
         altura = tamanho + (quantidade - 1) * passo;
         if (altura <= area.height || tamanho == 1)
@@ -180,15 +167,16 @@ void desenharTextoPergunta(const char texto[LIMITE_TEXTO_PERGUNTA + 1], Rectangl
     float y = area.y + (area.height - altura) / 2;
     for (int i = 0; i < quantidade; i++)
     {
+        const char *linha = buffer + linhas[i];
         float x = area.x;
         if (centralizar)
-            x += (area.width - MeasureTextEx(fonte, linhas[i], tamanho, 1).x) / 2;
-        DrawTextEx(fonte, linhas[i], (Vector2){x, y}, tamanho, 1, cor);
+            x += (area.width - MeasureTextEx(fonte, linha, tamanho, 1).x) / 2;
+        DrawTextEx(fonte, linha, (Vector2){x, y}, tamanho, 1, cor);
         y += passo;
     }
 }
 
-static void desenharPremioCabecalho(const char *rotulo, int valor, int x, Color cor)
+void desenharPremioCabecalho(const char *rotulo, int valor, int x, Color cor)
 {
     const Rectangle painel = {x, 34, 174, 68};
     DrawRectangleRec(painel, COR_AZUL);
@@ -197,7 +185,7 @@ static void desenharPremioCabecalho(const char *rotulo, int valor, int x, Color 
     textoCentradoEm(emReais(valor), x + 87, 65, 22, cor);
 }
 
-static void desenharCabecalho(const Jogo *jogo)
+void desenharCabecalho(const Jogo *jogo)
 {
     DrawCircle(70, 69, 36, COR_AZUL);
     DrawCircleLines(70, 69, 36, COR_DOURADO);
@@ -219,7 +207,7 @@ static void desenharCabecalho(const Jogo *jogo)
     desenharPremioCabecalho("PRÊMIO GARANTIDO", jogo->premioGarantido, 594, COR_DOURADO);
 }
 
-static void desenharEscudo(float x, float y, float escala, Color cor)
+void desenharEscudo(float x, float y, float escala, Color cor)
 {
     Vector2 pontos[] = {
         {x, y}, {x - escala, y - escala}, {x - escala, y},
@@ -234,7 +222,7 @@ static void desenharEscudo(float x, float y, float escala, Color cor)
                escala * 0.16f, COR_FUNDO);
 }
 
-static void desenharEscada(const Jogo *jogo)
+void desenharEscada(const Jogo *jogo)
 {
     const Rectangle painel = {568, 115, 200, 454};
     DrawRectangleRec(painel, COR_AZUL);
@@ -264,7 +252,7 @@ static void desenharEscada(const Jogo *jogo)
     }
 }
 
-static bool desenharAlternativa(const Jogo *jogo, const Pergunta *pergunta, int indice)
+bool desenharAlternativa(const Jogo *jogo, const Pergunta *pergunta, int indice)
 {
     char letra = (char)('A' + indice);
     Rectangle area = {32, 259 + indice * 65, 520, 58};
@@ -316,7 +304,7 @@ static bool desenharAlternativa(const Jogo *jogo, const Pergunta *pergunta, int 
     return mouseSobre && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
-static AcaoPergunta desenharConfirmacao(char resposta)
+AcaoPergunta desenharConfirmacao(char resposta)
 {
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(COR_FUNDO, 0.84f));
     const Rectangle painel = {166, 201, 468, 198};
@@ -476,7 +464,7 @@ AcaoResultado desenharResultado(const Jogo *jogo)
     return RESULTADO_SEM_ACAO;
 }
 
-static void desenharRegrasInstrucoes(void)
+void desenharRegrasInstrucoes(void)
 {
     DrawCircleLines(78, 203, 19, COR_DOURADO);
     textoCentradoEm("$", 78, 192, 22, COR_DOURADO);
@@ -494,7 +482,7 @@ static void desenharRegrasInstrucoes(void)
              58, 412, 20, COR_CLARO);
 }
 
-static void desenharPremiosInstrucoes(void)
+void desenharPremiosInstrucoes(void)
 {
     DrawText("DIFICULDADE", 65, 165, 15, COR_DOURADO);
     DrawText("PERGUNTAS", 292, 165, 15, COR_DOURADO);
@@ -520,7 +508,7 @@ static void desenharPremiosInstrucoes(void)
     DrawText(TextFormat("Sem checkpoint, o prêmio final é %s.", emReais(0)), 90, 418, 16, COR_CLARO);
 }
 
-static void desenharAjudasInstrucoes(void)
+void desenharAjudasInstrucoes(void)
 {
     DrawText("Guitar Hero  ·  PULAR E GANHAR", 58, 162, 21, COR_DOURADO);
     DrawText("Acerte pelo menos 70% das notas para conquistar o prêmio da rodada", 58, 192, 17, COR_CLARO);
@@ -543,7 +531,7 @@ static void desenharAjudasInstrucoes(void)
              66, 409, 16, COR_CLARO);
 }
 
-static bool botaoNavegacao(const char *texto, Rectangle area, bool disponivel)
+bool botaoNavegacao(const char *texto, Rectangle area, bool disponivel)
 {
     if (disponivel)
         return desenharBotao(texto, area);

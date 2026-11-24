@@ -43,7 +43,7 @@ Na raiz, `dados/` guarda o CSV inicial e o DAT ativo. `compilado/` recebe os exe
 - **`ArquivosBanco`** guarda a pasta, a trava do sistema e o modo de consulta. Esse estado pertence à sessão que abriu o banco.
 - **`Jogo`** guarda o estado da partida, a rodada de 0 a 14, o nível atual, o índice da pergunta, a letra escolhida, o prêmio, o bônus e o checkpoint. Os vetores de ajudas e alternativas usam o enum ou a letra como índice.
 - **`Tela` e `Estado`** representam decisões diferentes. A tela principal pode ser o editor ou a partida. Dentro da partida, o estado permite decidir entre sortear, mostrar pergunta, confirmar, revelar, avançar ou mostrar o resultado.
-- **`AnimacaoRoleta`** guarda o tempo do giro, o tempo do anúncio e os ângulos. `Roleta` acrescenta as categorias disponíveis. `RoletaDificuldade` acrescenta o nível base, os pesos e a opção sorteada.
+- **`Roleta`** guarda os tempos, os ângulos, os pesos e a posição sorteada. Quando `deDificuldade` é verdadeiro, a posição indica diminuir, manter ou aumentar o nível. No sorteio de categorias, ela indica uma das cinco categorias.
 - **`EditorBanco`** guarda a página, os filtros, a seleção, o campo em foco e o rascunho. `original` permite comparar o rascunho com o conteúdo ao abrir o formulário. `alterado` indica que há mudanças em memória aguardando salvamento.
 - **`Desafios`** guarda a etapa de uma ajuda ou treino, o tipo do minigame, a sessão e o placar final. `ResultadoMinigame` representa em curso, vitória, derrota ou abandono. O placar pode ser mostrado depois que a sessão foi liberada.
 
@@ -68,7 +68,7 @@ Na raiz, `dados/` guarda o CSV inicial e o DAT ativo. `compilado/` recebe os exe
 
 `&jogo` é o endereço da variável `jogo`. Uma função que recebe `Jogo *` pode alterar essa variável. Com `const Jogo *`, ela pode consultar os dados para desenhar a tela. Usa-se `->` para acessar o campo de uma struct por meio do ponteiro.
 
-Os vetores do banco começam com espaço para cinco perguntas. Ao esgotar a capacidade, `redimensionarBanco()` aloca dois vetores maiores, copia o conteúdo e só então libera os antigos. Se uma alocação falhar, o banco original continua utilizável. Dois `realloc()` em sequência permitiriam que só um vetor mudasse de endereço ou tamanho. Ao excluir, o laço desloca a pergunta e sua marca de uso juntas. Ao liberar o banco, os ponteiros voltam a `NULL`.
+Os vetores do banco começam com espaço para cinco perguntas. Ao esgotar a capacidade, `redimensionarBanco()` aloca dois vetores maiores. Um laço `for` copia a pergunta e a marca de uso de cada posição. Só depois os vetores antigos são liberados. Se uma alocação falhar, eles continuam utilizáveis. Ao excluir, outro laço desloca a pergunta e sua marca de uso juntas.
 
 As sessões de minigames são alocadas ao entrar e liberadas ao sair. Cada jogo conhece a própria struct. A interface guarda seu endereço em um `void *` junto do enum do tipo. Antes de acessar os dados, o `switch` entrega o endereço à função do tipo certo, como `AtualizarTiro()`.
 

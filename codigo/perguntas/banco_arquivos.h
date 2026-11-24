@@ -9,8 +9,7 @@ enum { CAMINHO_BANCO_MAXIMO = 4096 };
 typedef struct
 {
     char pasta[CAMINHO_BANCO_MAXIMO];
-    int trava;               // descritor do arquivo .banco-lock (flock)
-    bool bloqueado;
+    int trava;               // -1 quando nenhuma sessão está aberta.
     bool somenteLeitura;
 } ArquivosBanco;
 

@@ -5,13 +5,13 @@
 #include <string.h>
 
 enum { LINHAS_POR_PAGINA = 5, CAMPOS_FORMULARIO = 8 };
-static const Color corErroBanco = {255, 150, 151, 255};
-static const Color corAvisoBanco = {244, 202, 111, 255};
-static const Color corSucessoBanco = {137, 222, 171, 255};
-static const Rectangle areasSeletores[] = {{35, 397, 165, 42}, {216, 397, 238, 42}, {470, 397, 296, 42}};
+const Color corErroBanco = {255, 150, 151, 255};
+const Color corAvisoBanco = {244, 202, 111, 255};
+const Color corSucessoBanco = {137, 222, 171, 255};
+const Rectangle areasSeletores[] = {{35, 397, 165, 42}, {216, 397, 238, 42}, {470, 397, 296, 42}};
 
 // A mesma área recebe o clique e desenha o campo do formulário.
-static Rectangle areaCampoTexto(int indice)
+Rectangle areaCampoTexto(int indice)
 {
     return (Rectangle){175, 83 + indice * 56, 591, 42};
 }
@@ -21,13 +21,13 @@ void iniciarEditorBanco(EditorBanco *editor)
     *editor = (EditorBanco){.selecionada = -1, .edicao = -1};
 }
 
-static void mensagem(EditorBanco *editor, const char *texto, bool erro)
+void mensagem(EditorBanco *editor, const char *texto, bool erro)
 {
     editor->mensagem = texto;
     editor->erro = erro;
 }
 
-static bool rascunhoAlterado(const EditorBanco *editor)
+bool rascunhoAlterado(const EditorBanco *editor)
 {
     return editor->formulario && !perguntasIguais(&editor->rascunho, &editor->original);
 }
@@ -37,13 +37,13 @@ bool editorTemAlteracoes(const EditorBanco *editor)
     return editor->alterado || rascunhoAlterado(editor);
 }
 
-static bool botaoEditor(const char *texto, Rectangle area, bool ativo)
+bool botaoEditor(const char *texto, Rectangle area, bool ativo)
 {
     return desenharBotao(texto, area) && ativo;
 }
 
 // A fila da Raylib entrega pontos Unicode. Cada caractere entra inteiro no campo.
-static bool editarTexto(char *texto, int maximo)
+bool editarTexto(char *texto, int maximo)
 {
     size_t tamanho = strlen(texto);
     if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) && tamanho > 0)
@@ -69,14 +69,14 @@ static bool editarTexto(char *texto, int maximo)
             atingiuLimite = true;
             continue;
         }
-        memcpy(texto + tamanho, utf8, (size_t)bytes);
-        tamanho += (size_t)bytes;
+        for (int i = 0; i < bytes; i++)
+            texto[tamanho++] = utf8[i];
         texto[tamanho] = '\0';
     }
     return atingiuLimite;
 }
 
-static void desenharCampo(const char *texto, const char *vazio, Rectangle area, bool foco)
+void desenharCampo(const char *texto, const char *vazio, Rectangle area, bool foco)
 {
     DrawRectangleRec(area, COR_AZUL);
     DrawRectangleLinesEx(area, foco ? 2 : 1, foco ? COR_DOURADO : Fade(COR_DOURADO, 0.65f));
@@ -96,7 +96,7 @@ static void desenharCampo(const char *texto, const char *vazio, Rectangle area, 
     EndScissorMode();
 }
 
-static void desenharAvisos(const EditorBanco *editor, const ArquivosBanco *arquivos, const BancoPerguntas *banco)
+void desenharAvisos(const EditorBanco *editor, const ArquivosBanco *arquivos, const BancoPerguntas *banco)
 {
     int abaixo[5];
     int quantidade = 0;
@@ -130,7 +130,7 @@ static void desenharAvisos(const EditorBanco *editor, const ArquivosBanco *arqui
         DrawText("Um arquivo está inválido ou ilegível. Banco aberto para consulta.", 35, 508, 14, corAvisoBanco);
 }
 
-static void abrirFormulario(EditorBanco *editor, const BancoPerguntas *banco, int indice)
+void abrirFormulario(EditorBanco *editor, const BancoPerguntas *banco, int indice)
 {
     editor->edicao = indice;
     editor->rascunho = indice < 0 ? (Pergunta){.alternativa_correta = 'A',
@@ -141,7 +141,7 @@ static void abrirFormulario(EditorBanco *editor, const BancoPerguntas *banco, in
     editor->mensagem = NULL;
 }
 
-static bool aplicarFormulario(EditorBanco *editor, BancoPerguntas *banco)
+bool aplicarFormulario(EditorBanco *editor, BancoPerguntas *banco)
 {
     const char *erro = validarPergunta(&editor->rascunho);
     if (erro)
@@ -174,7 +174,7 @@ static bool aplicarFormulario(EditorBanco *editor, BancoPerguntas *banco)
     return true;
 }
 
-static bool salvarEditor(EditorBanco *editor, ArquivosBanco *arquivos, BancoPerguntas *banco)
+bool salvarEditor(EditorBanco *editor, ArquivosBanco *arquivos, BancoPerguntas *banco)
 {
     if (rascunhoAlterado(editor) && !aplicarFormulario(editor, banco))
         return false;
@@ -186,7 +186,7 @@ static bool salvarEditor(EditorBanco *editor, ArquivosBanco *arquivos, BancoPerg
     return true;
 }
 
-static void desenharDetalhe(const Pergunta *p)
+void desenharDetalhe(const Pergunta *p)
 {
     const Rectangle painel = {367, 138, 399, 302};
     DrawRectangleRec(painel, COR_AZUL);
@@ -209,37 +209,14 @@ static void desenharDetalhe(const Pergunta *p)
                         p->alternativa_correta), 381, 409, 16, COR_DOURADO);
 }
 
-static bool passaNosFiltros(const EditorBanco *editor, const Pergunta *p)
+bool passaNosFiltros(const EditorBanco *editor, const Pergunta *p)
 {
     return (!editor->filtroCategoria || (int)p->categorias == editor->filtroCategoria) &&
            (!editor->filtroNivel || (int)p->dificuldades == editor->filtroNivel) &&
-           perguntaContem(p, editor->pesquisa);
+           strstr(p->conteudo_da_pergunta, editor->pesquisa) != NULL;
 }
 
-static int listarPagina(EditorBanco *editor, const BancoPerguntas *banco, int indices[LINHAS_POR_PAGINA])
-{
-    int total = 0;
-    for (int i = 0; i < banco->quantidade; i++)
-        total += passaNosFiltros(editor, &banco->perguntas[i]);
-
-    int ultima = total > 0 ? (total - 1) / LINHAS_POR_PAGINA : 0;
-    if (editor->pagina > ultima)
-        editor->pagina = ultima;
-    int inicio = editor->pagina * LINHAS_POR_PAGINA;
-    int posicao = 0;
-    for (int i = 0; i < banco->quantidade; i++)
-    {
-        if (passaNosFiltros(editor, &banco->perguntas[i]))
-        {
-            if (posicao >= inicio && posicao < inicio + LINHAS_POR_PAGINA)
-                indices[posicao - inicio] = i;
-            posicao++;
-        }
-    }
-    return total;
-}
-
-static void desenharConsulta(EditorBanco *editor, const ArquivosBanco *arquivos, const BancoPerguntas *banco, bool ativo)
+void desenharConsulta(EditorBanco *editor, const ArquivosBanco *arquivos, const BancoPerguntas *banco, bool ativo)
 {
     DrawText("BANCO DE PERGUNTAS", 35, 34, 28, COR_DOURADO);
     const char *total = TextFormat("%d perguntas cadastradas", banco->quantidade);
@@ -273,15 +250,30 @@ static void desenharConsulta(EditorBanco *editor, const ArquivosBanco *arquivos,
         editor->pagina = 0;
     }
 
-    int indices[LINHAS_POR_PAGINA] = {-1, -1, -1, -1, -1};
-    int quantidade = listarPagina(editor, banco, indices);
+    int quantidade = 0;
+    for (int i = 0; i < banco->quantidade; i++)
+        if (passaNosFiltros(editor, &banco->perguntas[i]))
+            quantidade++;
+    int ultima = quantidade > 0 ? (quantidade - 1) / LINHAS_POR_PAGINA : 0;
+    if (editor->pagina > ultima)
+        editor->pagina = ultima;
+
     if (editor->selecionada >= banco->quantidade ||
         (editor->selecionada >= 0 && !passaNosFiltros(editor, &banco->perguntas[editor->selecionada])))
         editor->selecionada = -1;
-    for (int i = 0; i < LINHAS_POR_PAGINA && indices[i] >= 0; i++)
+    int pular = editor->pagina * LINHAS_POR_PAGINA;
+    int exibidas = 0;
+    for (int indice = 0; indice < banco->quantidade && exibidas < LINHAS_POR_PAGINA; indice++)
     {
-        int indice = indices[i];
-        Rectangle linha = {35, 138 + i * 52, 315, 46};
+        if (!passaNosFiltros(editor, &banco->perguntas[indice]))
+            continue;
+        if (pular > 0)
+        {
+            pular--;
+            continue;
+        }
+        Rectangle linha = {35, 138 + exibidas * 52, 315, 46};
+        exibidas++;
         bool sobre = CheckCollisionPointRec(GetMousePosition(), linha);
         bool selecionada = editor->selecionada == indice;
         DrawRectangleRec(linha, sobre || selecionada ? ColorBrightness(COR_AZUL, 0.14f) : COR_AZUL);
@@ -295,7 +287,6 @@ static void desenharConsulta(EditorBanco *editor, const ArquivosBanco *arquivos,
     if (quantidade == 0)
         DrawText("Nenhuma pergunta encontrada.", 39, 152, 16, COR_CLARO);
 
-    int ultima = quantidade > 0 ? (quantidade - 1) / LINHAS_POR_PAGINA : 0;
     if (editor->pagina > 0 && botaoEditor("<", (Rectangle){35, 407, 50, 34}, ativo))
         editor->pagina--;
     if (editor->pagina < ultima && botaoEditor(">", (Rectangle){300, 407, 50, 34}, ativo))
@@ -313,7 +304,7 @@ static void desenharConsulta(EditorBanco *editor, const ArquivosBanco *arquivos,
     }
 }
 
-static void editarSeletores(EditorBanco *editor, bool ativo)
+void editarSeletores(EditorBanco *editor, bool ativo)
 {
     const char *rotulos[] = {"Gabarito", "Dificuldade", "Categoria"};
     int valores[] = {editor->rascunho.alternativa_correta - 'A',
@@ -361,7 +352,7 @@ static void editarSeletores(EditorBanco *editor, bool ativo)
     editor->rascunho.categorias = (Categoria)(valores[2] + 1);
 }
 
-static void desenharFormulario(EditorBanco *editor, bool ativo)
+void desenharFormulario(EditorBanco *editor, bool ativo)
 {
     DrawText(editor->edicao < 0 ? "ADICIONAR PERGUNTA" : "EDITAR PERGUNTA", 35, 34, 28, COR_DOURADO);
     if (ativo && IsKeyPressed(KEY_TAB))
@@ -401,7 +392,7 @@ static void desenharFormulario(EditorBanco *editor, bool ativo)
     DrawText("TAB muda o campo. Nas opções, use as setas, a letra ou o número.", 35, 452, 15, COR_CLARO);
 }
 
-static void desenharModal(const char *titulo, const char *texto)
+void desenharModal(const char *titulo, const char *texto)
 {
     DrawRectangle(0, 0, 800, 600, Fade(COR_FUNDO, 0.86f));
     const Rectangle painel = {90, 192, 620, 198};
@@ -411,7 +402,7 @@ static void desenharModal(const char *titulo, const char *texto)
     textoCentralizado(texto, 262, 17, COR_CLARO);
 }
 
-static AcaoEditor confirmarAcao(EditorBanco *editor, ArquivosBanco *arquivos, BancoPerguntas *banco)
+AcaoEditor confirmarAcao(EditorBanco *editor, ArquivosBanco *arquivos, BancoPerguntas *banco)
 {
     if (editor->confirmacao == CONFIRMAR_EXCLUSAO)
     {

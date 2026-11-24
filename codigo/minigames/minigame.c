@@ -4,11 +4,6 @@
 #include "travessia/travessia.h"
 #include <stddef.h>
 
-bool minigameDisponivel(TipoMinigame tipo)
-{
-    return tipo == GUITAR_HERO || tipo == TIRO_AO_ALVO || tipo == TRAVESSIA;
-}
-
 const char *nomeOpcaoMinigame(TipoMinigame tipo, bool treino, int opcao)
 {
     switch (tipo)

@@ -76,7 +76,7 @@ void liberaBancoPergunta (BancoPerguntas *banco);
  * @param perguntas onde a pergunta e guardada
  * @return 1 quando termina
  */
-int lerPergunta(Pergunta *perguntas);
+int lerPergunta(Pergunta *perguntas, bool editando);
 
 /**
  * @brief Adiciona uma pergunta, aumentando o vetor se precisar.
@@ -89,7 +89,6 @@ int adicionaPerguntas(BancoPerguntas *banco, const Pergunta *perguntas);
 /** @brief Retorna NULL quando todos os campos são válidos. */
 const char *validarPergunta(const Pergunta *pergunta);
 bool perguntasIguais(const Pergunta *a, const Pergunta *b);
-bool perguntaContem(const Pergunta *pergunta, const char *trecho);
 int contaPerguntasDistintas(const BancoPerguntas *banco, Dificuldade dificuldade);
 bool editarPerguntaPorIndice(BancoPerguntas *banco, int indice, const Pergunta *pergunta);
 bool excluirPerguntaPorIndice(BancoPerguntas *banco, int indice);

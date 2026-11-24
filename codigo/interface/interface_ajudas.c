@@ -4,9 +4,9 @@
 #include <math.h>
 #include <stddef.h>
 
-static const Rectangle areaAbandonar = {615, 538, 165, 40};
-static const Rectangle areaVoltar = {43, 522, 185, 42};
-static const struct
+const Rectangle areaAbandonar = {615, 538, 165, 40};
+const Rectangle areaVoltar = {43, 522, 185, 42};
+const struct
 {
     const char *nome;
     const char *recompensa;
@@ -16,20 +16,16 @@ static const struct
     [TIRO_AO_ALVO] = {"TIRO AO ALVO", "ELIMINAR DUAS\nALTERNATIVAS"}
 };
 
-static bool disponivel(const Jogo *jogo, TipoMinigame tipo)
-{
-    return minigameDisponivel(tipo) && (!jogo || ajudaDisponivel(jogo, tipo));
-}
-
 int contarAjudasDisponiveis(const Jogo *jogo)
 {
     int total = 0;
     for (int i = GUITAR_HERO; i < QUANTIDADE_MINIGAMES; i++)
-        total += disponivel(jogo, (TipoMinigame)i);
+        if (!jogo || ajudaDisponivel(jogo, (TipoMinigame)i))
+            total++;
     return total;
 }
 
-static void encerrarSessao(Desafios *desafios)
+void encerrarSessao(Desafios *desafios)
 {
     if (desafios->sessao)
     {
@@ -50,12 +46,12 @@ void abrirDesafios(Desafios *desafios)
     desafios->tela = DESAFIOS_CARTOES;
 }
 
-static bool teclaVoltar(void)
+bool teclaVoltar(void)
 {
     return IsKeyPressed(KEY_BACKSPACE) || IsKeyPressed(KEY_ESCAPE);
 }
 
-static void finalizarDesafio(Desafios *desafios, Jogo *jogo, const Pergunta *pergunta, ResultadoMinigame resultado)
+void finalizarDesafio(Desafios *desafios, Jogo *jogo, const Pergunta *pergunta, ResultadoMinigame resultado)
 {
     desafios->placar = placarMinigame(desafios->tipo, desafios->sessao);
     // A faixa do Guitar Hero já terminou. Libera o PCM ao sair do resultado.
@@ -84,7 +80,7 @@ void atualizarDesafios(Desafios *desafios, Jogo *jogo, const Pergunta *pergunta,
     }
 }
 
-static void desenharSimbolo(TipoMinigame tipo, int x, int y, Color cor)
+void desenharSimbolo(TipoMinigame tipo, int x, int y, Color cor)
 {
     DrawCircleLines(x, y, 38, cor);
     if (tipo == GUITAR_HERO)
@@ -108,7 +104,7 @@ static void desenharSimbolo(TipoMinigame tipo, int x, int y, Color cor)
     }
 }
 
-static bool desenharCartoes(Desafios *desafios, const Jogo *jogo)
+bool desenharCartoes(Desafios *desafios, const Jogo *jogo)
 {
     desenharFundo();
     textoCentralizado(jogo ? "ESCOLHA SUA AJUDA" : "TREINO DE MINIGAMES", 52, 33, COR_DOURADO);
@@ -124,7 +120,7 @@ static bool desenharCartoes(Desafios *desafios, const Jogo *jogo)
         TipoMinigame tipo = (TipoMinigame)i;
         Rectangle area = {36 + (i - GUITAR_HERO) * 248, 155, 232, 322};
         int centro = (int)(area.x + area.width / 2);
-        bool ativo = disponivel(jogo, tipo);
+        bool ativo = !jogo || ajudaDisponivel(jogo, tipo);
         bool sobre = ativo && CheckCollisionPointRec(GetMousePosition(), area);
         Color borda = ativo ? COR_DOURADO : Fade(COR_DOURADO, 0.45f);
         Color letras = ativo ? COR_CLARO : Fade(COR_CLARO, 0.58f);
@@ -148,12 +144,7 @@ static bool desenharCartoes(Desafios *desafios, const Jogo *jogo)
         }
         else
         {
-            const char *situacao = "JÁ UTILIZADO";
-            if (ativo)
-                situacao = "DISPONÍVEL";
-            else if (!minigameDisponivel(tipo))
-                situacao = "CÓDIGO INDISPONÍVEL";
-            textoCentradoEm(situacao, centro, 421, 15, letras);
+            textoCentradoEm(ativo ? "DISPONÍVEL" : "JÁ UTILIZADO", centro, 421, 15, letras);
         }
 
         if (sobre && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
@@ -168,9 +159,9 @@ static bool desenharCartoes(Desafios *desafios, const Jogo *jogo)
     return desenharBotao("VOLTAR", areaVoltar) || teclaVoltar();
 }
 
-static void iniciarDesafio(Desafios *desafios, Jogo *jogo)
+void iniciarDesafio(Desafios *desafios, Jogo *jogo)
 {
-    if (!disponivel(jogo, desafios->tipo))
+    if (jogo && !ajudaDisponivel(jogo, desafios->tipo))
         return;
 
     encerrarSessao(desafios);
@@ -190,7 +181,7 @@ static void iniciarDesafio(Desafios *desafios, Jogo *jogo)
     desafios->tela = DESAFIOS_JOGANDO;
 }
 
-static void desenharInstrucoes(Desafios *desafios, Jogo *jogo)
+void desenharInstrucoes(Desafios *desafios, Jogo *jogo)
 {
     desenharFundo();
     const Rectangle painel = {66, 43, 668, 461};
@@ -258,7 +249,7 @@ static void desenharInstrucoes(Desafios *desafios, Jogo *jogo)
         iniciarDesafio(desafios, jogo);
 }
 
-static bool desenharResultadoDesafio(Desafios *desafios, Jogo *jogo)
+bool desenharResultadoDesafio(Desafios *desafios, Jogo *jogo)
 {
     desenharFundo();
     bool venceu = jogo ? desafios->recompensa : desafios->resultado == MINIGAME_VITORIA;

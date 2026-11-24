@@ -14,7 +14,6 @@ typedef struct
     int notas;
 } PlacarMinigame;
 
-bool minigameDisponivel(TipoMinigame tipo);
 /** @brief Nome da faixa para o modo e índice escolhidos. NULL indica ausência de opção. */
 const char *nomeOpcaoMinigame(TipoMinigame tipo, bool treino, int opcao);
 /** @brief Cria a sessão do tipo escolhido. Retorna NULL se não conseguiu iniciar. */
