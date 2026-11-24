@@ -31,6 +31,7 @@ typedef struct
     int premioPerdido;
     int bonus;               // Soma dos bônus por acertar com a dificuldade aumentada.
     bool girouDificuldade;   // A roleta de dificuldade só pode ser usada uma vez por rodada.
+    Categoria anteriores[2]; // Categorias das duas últimas rodadas ([0] é a mais recente; 0 = nenhuma).
     bool segundaChance;
     char respostaBloqueada;
     bool eliminadas[4];
@@ -58,6 +59,12 @@ bool concluirAjuda(Jogo *jogo, const Pergunta *pergunta, ResultadoMinigame resul
 
 /** @brief Indica se o jogador ainda pode girar a roleta de dificuldade nesta rodada. */
 bool podeGirarDificuldade(const Jogo *jogo);
+
+/**
+ * @brief Categoria que não pode sair na próxima roleta, para evitar 3 iguais seguidas.
+ * @return a categoria das duas últimas rodadas, se foram iguais; senão 0 (nenhuma bloqueada)
+ */
+Categoria categoriaBloqueada(const Jogo *jogo);
 
 /** @brief Aplica o resultado da roleta de dificuldade (-1, 0 ou +1 nível, limitado de 1 a 5). */
 void aplicarDificuldade(Jogo *jogo, int variacao);

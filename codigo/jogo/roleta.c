@@ -21,18 +21,29 @@ static const struct
     {BIOLOGIA, {139, 55, 80, 255}}
 };
 
-void iniciarRoleta(Roleta *roleta, const BancoPerguntas *banco, Dificuldade dificuldade)
+void iniciarRoleta(Roleta *roleta, const BancoPerguntas *banco, Dificuldade dificuldade,
+                   Categoria bloqueada)
 {
     *roleta = (Roleta){.estado = ROLETA_PRONTA};
     if (!banco)
         return;
 
     // Os cinco setores continuam visíveis, mas só entram no sorteio os que têm perguntas inéditas.
+    int indiceBloqueado = -1;
     for (int i = 0; i < SETORES_ROLETA; i++)
     {
         roleta->disponiveis[i] = contaPerguntasDisponiveis(banco, dificuldade, setores[i].categoria) > 0;
         if (roleta->disponiveis[i])
             roleta->quantidadeDisponivel++;
+        if (setores[i].categoria == bloqueada)
+            indiceBloqueado = i;
+    }
+
+    // Evita a terceira repetição seguida, mas só se ainda sobrar outra categoria para sortear.
+    if (indiceBloqueado >= 0 && roleta->disponiveis[indiceBloqueado] && roleta->quantidadeDisponivel > 1)
+    {
+        roleta->disponiveis[indiceBloqueado] = false;
+        roleta->quantidadeDisponivel--;
     }
 }
 

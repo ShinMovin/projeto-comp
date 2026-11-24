@@ -36,7 +36,7 @@ typedef struct
 
 static void prepararRoleta(PartidaGrafica *partida, const BancoPerguntas *banco)
 {
-    iniciarRoleta(&partida->roleta, banco, partida->jogo.dificuldade);
+    iniciarRoleta(&partida->roleta, banco, partida->jogo.dificuldade, categoriaBloqueada(&partida->jogo));
     partida->avisoRoleta = banco ? NULL : "Não foi possível abrir o banco de perguntas.";
     partida->naRoletaDificuldade = false;
 }

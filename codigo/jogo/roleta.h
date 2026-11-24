@@ -34,7 +34,8 @@ typedef struct
     float anguloFinal;
 } RoletaDificuldade;
 
-void iniciarRoleta(Roleta *roleta, const BancoPerguntas *banco, Dificuldade dificuldade);
+/** @brief Prepara a roleta de categorias. @param bloqueada categoria que não pode sair (0 = nenhuma) */
+void iniciarRoleta(Roleta *roleta, const BancoPerguntas *banco, Dificuldade dificuldade, Categoria bloqueada);
 bool girarRoleta(Roleta *roleta);
 void atualizarRoleta(Roleta *roleta, float tempoQuadro);
 /**

@@ -139,6 +139,9 @@ bool avancarRodada(Jogo *jogo)
     jogo->rodada++;
     jogo->dificuldade = dificuldadeRodada(jogo->rodada);
     jogo->indicePergunta = -1;
+    // Guarda o histórico antes de limpar a categoria da rodada que terminou.
+    jogo->anteriores[1] = jogo->anteriores[0];
+    jogo->anteriores[0] = jogo->categoria;
     jogo->categoria = 0;
     jogo->resposta = '\0';
     jogo->respostaBloqueada = '\0';
@@ -231,4 +234,11 @@ void aplicarDificuldade(Jogo *jogo, int variacao)
         nova = IMPOSSIVEL;
     jogo->dificuldade = (Dificuldade)nova;
     jogo->girouDificuldade = true;
+}
+
+Categoria categoriaBloqueada(const Jogo *jogo)
+{
+    if (jogo->anteriores[0] != 0 && jogo->anteriores[0] == jogo->anteriores[1])
+        return jogo->anteriores[0];
+    return 0;
 }
