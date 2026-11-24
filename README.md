@@ -19,11 +19,16 @@ O primeiro comando gera `compilado/jogo.exe`. O segundo também abre o jogo. Par
 
 ### Linux
 
-Com GCC, Make e Raylib para Linux disponíveis:
+Com GCC, Make e Raylib para Linux disponíveis, compile a partir da raiz do projeto.
 
 ```bash
-make -C codigo
-./compilado/jogo
+make
+```
+
+Para abrir o jogo, use o comando abaixo. Ele também compila o necessário antes de executar.
+
+```bash
+make run
 ```
 
 Para abrir o gerenciamento pelo terminal, execute `./compilado/jogo --banco`.

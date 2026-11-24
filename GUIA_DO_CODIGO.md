@@ -32,7 +32,7 @@ Os caminhos de fontes abaixo são relativos a `codigo/`. Em geral, o `.h` declar
 | `minigames/guitarhero/mapas.h` | Vetores de notas. Cada linha relevante contém tempo de início, duração e trilha. |
 | `minigames/tiroalvo/tiroalvo.{c,h}` | Alvos, aparições, movimento, prioridade dos cliques, pontuação e áudio. |
 | `minigames/travessia/travessia.{c,h}` | Grade, geração das pistas, movimento, colisões, vidas e modos com meta ou infinito. |
-| `Makefile` e `compilar.cmd` | O Makefile lista fontes, bibliotecas e recursos. O atalho prepara o ambiente UCRT64 no Windows. |
+| `codigo/Makefile`, `Makefile` da raiz e `compilar.cmd` | O primeiro lista fontes, bibliotecas e recursos. O Makefile da raiz encaminha `make` e `make run`. O atalho do Windows prepara o ambiente UCRT64. |
 
 Na raiz, `dados/` guarda o CSV inicial e o DAT ativo. `compilado/` recebe os executáveis e as cópias dos áudios. O `README.md` mostra como compilar e jogar. O `.gitignore` lista arquivos gerados pelo programa e pelo compilador.
 
