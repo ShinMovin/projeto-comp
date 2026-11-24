@@ -43,7 +43,7 @@ FONTES = main.c $(DESENHO) \
     interface/interface.c interface/interface_ajudas.c interface/interface_banco.c \
     perguntas/perguntas.c perguntas/banco_arquivos.c \
     jogo/jogo.c jogo/premio.c jogo/roleta.c \
-    minigames/minigame.c $(GUITARHERO_FONTES) $(TIROALVO_FONTES)
+    minigames/minigame.c $(GUITARHERO_FONTES) $(TIROALVO_FONTES) $(TRAVESSIA_FONTES)
 CABECALHOS = $(wildcard *.h interface/*.h perguntas/*.h jogo/*.h minigames/*.h minigames/*/*.h)
 JOGO = $(PASTA)/jogo$(EXT)
 
@@ -62,7 +62,11 @@ ifneq ($(wildcard minigames/tiroalvo/audio/musica-local.mp3),)
     TIROALVO_AUDIO += $(PASTA)/audio-tiroalvo/musica-local.mp3
 endif
 
-.PHONY: all run guitarhero run-guitarhero tiroalvo run-tiroalvo clean
+# Minigame Travessia
+TRAVESSIA_FONTES = minigames/travessia/travessia.c
+TRAVESSIA = $(PASTA)/travessia$(EXT)
+
+.PHONY: all run guitarhero run-guitarhero tiroalvo run-tiroalvo travessia run-travessia clean
 
 all: $(JOGO)
 
@@ -105,5 +109,14 @@ $(PASTA)/audio-tiroalvo/%: minigames/tiroalvo/audio/%
 run-tiroalvo: $(TIROALVO)
 	$(TIROALVO)
 
+travessia: $(TRAVESSIA)
+
+$(TRAVESSIA): $(TRAVESSIA_FONTES) $(DESENHO) $(CABECALHOS) Makefile $(RAYLIB_ARQUIVO)
+	mkdir -p "$(PASTA)"
+	$(CC) -std=c99 -DTRAVESSIA_INDEPENDENTE $(CPPFLAGS) $(INCLUDES_PROJETO) $(RAYLIB_CFLAGS) $(CFLAGS) $(TRAVESSIA_FONTES) $(DESENHO) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
+
+run-travessia: $(TRAVESSIA)
+	$(TRAVESSIA)
+
 clean:
-	rm -f $(JOGO) $(GUITARHERO) $(GUITARHERO_AUDIO) $(TIROALVO) $(TIROALVO_AUDIO)
+	rm -f $(JOGO) $(GUITARHERO) $(GUITARHERO_AUDIO) $(TIROALVO) $(TIROALVO_AUDIO) $(TRAVESSIA)

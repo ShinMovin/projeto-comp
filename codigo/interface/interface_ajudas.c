@@ -12,7 +12,7 @@ static const struct
     const char *recompensa;
 } cartoes[QUANTIDADE_MINIGAMES] = {
     [GUITAR_HERO] = {"GUITAR HERO", "PULAR E GANHAR"},
-    [CROSSY_ROAD] = {"CROSSY ROAD", "SEGUNDA CHANCE"},
+    [TRAVESSIA] = {"TRAVESSIA", "SEGUNDA CHANCE"},
     [TIRO_AO_ALVO] = {"TIRO AO ALVO", "ELIMINAR DUAS\nALTERNATIVAS"}
 };
 
@@ -93,7 +93,7 @@ static void desenharSimbolo(TipoMinigame tipo, int x, int y, Color cor)
         DrawLineEx((Vector2){x - 9, y + 8}, (Vector2){x + 19, y - 21}, 5, cor);
         DrawCircleV((Vector2){x + 18, y - 20}, 5, cor);
     }
-    else if (tipo == CROSSY_ROAD)
+    else if (tipo == TRAVESSIA)
     {
         DrawLine(x - 24, y + 15, x + 24, y + 15, cor);
         DrawLine(x - 24, y - 15, x + 24, y - 15, cor);
@@ -216,7 +216,9 @@ static void desenharInstrucoes(Desafios *desafios, Jogo *jogo)
     }
     else
     {
-        textoCentralizado("Complete a travessia conforme as regras do desafio.", 224, 20, COR_DOURADO);
+        textoCentralizado("Use as setas ou WASD para pular de casa em casa.", 146, 19, COR_CLARO);
+        textoCentralizado("Desvie dos carros e não fique para trás: você tem 3 vidas.", 179, 19, COR_CLARO);
+        textoCentralizado("Avance 25 pistas para completar a travessia.", 224, 20, COR_DOURADO);
         if (jogo)
             textoCentralizado("Recompensa: uma segunda chance nesta pergunta.", 268, 18, COR_CLARO);
     }
@@ -272,7 +274,7 @@ static bool desenharResultadoDesafio(Desafios *desafios, Jogo *jogo)
     if (jogo && venceu)
     {
         const char *mensagem = desafios->tipo == GUITAR_HERO ? "PULAR E GANHAR: valor da rodada conquistado." :
-            desafios->tipo == CROSSY_ROAD ? "SEGUNDA CHANCE: você pode errar uma vez." :
+            desafios->tipo == TRAVESSIA ? "SEGUNDA CHANCE: você pode errar uma vez." :
             "Duas alternativas incorretas foram eliminadas.";
         textoCentralizado(mensagem, 308, 20, Fade(COR_CLARO, entrada));
     }

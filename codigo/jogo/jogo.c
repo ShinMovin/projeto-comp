@@ -208,7 +208,7 @@ bool concluirAjuda(Jogo *jogo, const Pergunta *pergunta, ResultadoMinigame resul
             return false;
         conquistarRodada(jogo);
         return true;
-    case CROSSY_ROAD:
+    case TRAVESSIA:
         jogo->segundaChance = true;
         return true;
     case TIRO_AO_ALVO:

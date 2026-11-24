@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-typedef enum { SEM_MINIGAME, GUITAR_HERO, CROSSY_ROAD, TIRO_AO_ALVO, QUANTIDADE_MINIGAMES } TipoMinigame;
+typedef enum { SEM_MINIGAME, GUITAR_HERO, TRAVESSIA, TIRO_AO_ALVO, QUANTIDADE_MINIGAMES } TipoMinigame;
 typedef enum { MINIGAME_EM_CURSO, MINIGAME_VITORIA, MINIGAME_DERROTA, MINIGAME_ABANDONADO } ResultadoMinigame;
 
 typedef struct

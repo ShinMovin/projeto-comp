@@ -517,10 +517,8 @@ static void desenharAjudasInstrucoes(void)
     DrawText("e avançar sem responder. Indisponível na pergunta do milhão.", 58, 214, 17, COR_CLARO);
 
     DrawLine(58, 240, 742, 240, Fade(COR_DOURADO, 0.4f));
-    DrawText("Crossy Road  ·  SEGUNDA CHANCE", 58, 249, 21, COR_DOURADO);
-    if (!obterMinigame(CROSSY_ROAD))
-        textoADireita("Temporariamente indisponível", 742, 252, 15, corLegenda);
-    DrawText("Complete a travessia para ganhar outra chance de responder à pergunta atual.",
+    DrawText("Travessia  ·  SEGUNDA CHANCE", 58, 249, 21, COR_DOURADO);
+    DrawText("Avance 25 pistas com 3 vidas para ganhar outra chance na pergunta atual.",
              58, 278, 17, COR_CLARO);
 
     DrawLine(58, 302, 742, 302, Fade(COR_DOURADO, 0.4f));
