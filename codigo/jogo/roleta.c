@@ -79,6 +79,13 @@ void atualizarRoleta(Roleta *roleta, float tempoQuadro)
     }
 }
 
+static void desenharPonteiro(void)
+{
+    // A ponta fixa fica sobre o disco, no ângulo usado pelo cálculo do giro.
+    DrawTriangle((Vector2){384, 68}, (Vector2){400, 113}, (Vector2){416, 68}, COR_FUNDO);
+    DrawTriangle((Vector2){388, 71}, (Vector2){400, 106}, (Vector2){412, 71}, COR_DOURADO);
+}
+
 static void desenharDisco(const Roleta *roleta)
 {
     const Vector2 centro = {400, 267};
@@ -117,16 +124,42 @@ static void desenharDisco(const Roleta *roleta)
     DrawCircleV(centro, 35, COR_AZUL);
     textoCentralizado("?", (int)centro.y - 22, 44, COR_CLARO);
 
-    // A ponta fixa fica sobre o disco, no ângulo usado pelo cálculo do giro.
-    DrawTriangle((Vector2){384, 68}, (Vector2){400, 113}, (Vector2){416, 68}, COR_FUNDO);
-    DrawTriangle((Vector2){388, 71}, (Vector2){400, 106}, (Vector2){412, 71}, COR_DOURADO);
+    desenharPonteiro();
 }
 
-AcaoRoleta desenharRoleta(const Roleta *roleta, const char *aviso)
+// Botão redondo ao lado da roleta de categorias que abre a roleta de dificuldade.
+static bool desenharBotaoDificuldade(Dificuldade dificuldade, bool disponivel)
+{
+    const Vector2 centro = {690, 267};
+    const float raio = 56.0f;
+    bool sobre = disponivel && CheckCollisionPointCircle(GetMousePosition(), centro, raio);
+    float pulso = disponivel ? 0.5f + 0.5f * sinf((float)GetTime() * 3.0f) : 0.0f;
+    Color borda = disponivel ? COR_DOURADO : Fade(COR_DOURADO, 0.35f);
+    Color texto = disponivel ? COR_CLARO : Fade(COR_CLARO, 0.4f);
+
+    if (disponivel)
+        DrawCircleV(centro, raio + 6 + 3 * pulso, Fade(COR_DOURADO, 0.12f + 0.1f * pulso));
+    DrawCircleV(centro, raio, sobre ? ColorBrightness(COR_AZUL, 0.25f) : COR_AZUL);
+    DrawCircleLines((int)centro.x, (int)centro.y, raio, borda);
+    DrawCircleLines((int)centro.x, (int)centro.y, raio - 4, borda);
+    textoCentradoEm("NÍVEL", (int)centro.x, (int)centro.y - 36, 13, texto);
+    textoCentradoEm(TextFormat("%d", dificuldade), (int)centro.x, (int)centro.y - 21, 36, borda);
+    textoCentradoEm(disponivel ? "MUDAR?" : "GIRADA", (int)centro.x, (int)centro.y + 19, 13, texto);
+    textoCentradoEm("ROLETA DE", (int)centro.x, (int)(centro.y + raio + 12), 14, texto);
+    textoCentradoEm("DIFICULDADE", (int)centro.x, (int)(centro.y + raio + 29), 14, texto);
+
+    return sobre && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+}
+
+AcaoRoleta desenharRoleta(const Roleta *roleta, const char *aviso, Dificuldade dificuldade,
+                          bool podeMudarDificuldade)
 {
     desenharFundo();
     textoCentralizado("ROLETA DE CATEGORIAS", 33, 26, COR_DOURADO);
     desenharDisco(roleta);
+    // Depois de girar as categorias, a dificuldade já ficou definida para esta pergunta.
+    if (desenharBotaoDificuldade(dificuldade, podeMudarDificuldade && roleta->estado == ROLETA_PRONTA))
+        return ROLETA_DIFICULDADE;
 
     bool anuncioCompleto = roleta->tempoAnuncio >= DURACAO_ANUNCIO;
     if (roleta->estado == ROLETA_RESULTADO)
@@ -151,6 +184,194 @@ AcaoRoleta desenharRoleta(const Roleta *roleta, const char *aviso)
     else if (roleta->estado == ROLETA_PRONTA && desenharBotao("GIRAR ROLETA", areaAcao))
         return ROLETA_GIRAR;
     else if (anuncioCompleto && desenharBotao("PROSSEGUIR PARA A PERGUNTA", areaAcao))
+        return ROLETA_PROSSEGUIR;
+
+    return ROLETA_NENHUMA_ACAO;
+}
+
+/* ---------- Roleta de dificuldade ---------- */
+
+static const struct
+{
+    const char *nome;
+    const char *efeito;
+    Color cor;
+} opcoesDificuldade[QUANTIDADE_OPCOES_DIF] = {
+    {"DIMINUIR", "-1 nível", {39, 122, 83, 255}},
+    {"MANTER", "mesmo nível", {45, 94, 150, 255}},
+    {"AUMENTAR", "+1 nível", {150, 52, 64, 255}}
+};
+
+static bool temPerguntasNoNivel(const BancoPerguntas *banco, int nivel)
+{
+    if (!banco || nivel < MUITO_FACIL || nivel > IMPOSSIVEL)
+        return false;
+    for (int categoria = GEEK; categoria <= BIOLOGIA; categoria++)
+    {
+        if (contaPerguntasDisponiveis(banco, (Dificuldade)nivel, (Categoria)categoria) > 0)
+            return true;
+    }
+    return false;
+}
+
+static int totalChances(const RoletaDificuldade *roleta)
+{
+    int total = 0;
+    for (int i = 0; i < QUANTIDADE_OPCOES_DIF; i++)
+        total += roleta->chances[i];
+    return total;
+}
+
+void iniciarRoletaDificuldade(RoletaDificuldade *roleta, const BancoPerguntas *banco, int rodada)
+{
+    *roleta = (RoletaDificuldade){.estado = ROLETA_PRONTA, .base = dificuldadeRodada(rodada)};
+    chancesDificuldade(rodada, roleta->chances);
+    // Uma opção sai da roleta se passar do nível 1 a 5 ou se não houver pergunta inédita nela.
+    if (!temPerguntasNoNivel(banco, roleta->base - 1))
+        roleta->chances[DIF_DIMINUIR] = 0;
+    if (!temPerguntasNoNivel(banco, roleta->base + 1))
+        roleta->chances[DIF_AUMENTAR] = 0;
+}
+
+bool girarRoletaDificuldade(RoletaDificuldade *roleta)
+{
+    int total = totalChances(roleta);
+    if (roleta->estado != ROLETA_PRONTA || total == 0)
+        return false;
+
+    // Sorteio ponderado: cada opção ocupa uma faixa do tamanho da sua chance.
+    int sorteado = rand() % total;
+    int inicio = 0;
+    for (int i = 0; i < QUANTIDADE_OPCOES_DIF; i++)
+    {
+        if (sorteado < inicio + roleta->chances[i])
+        {
+            roleta->resultado = (OpcaoDificuldade)i;
+            // Para em um ponto aleatório dentro do setor, longe das bordas.
+            float largura = roleta->chances[i] * 3.6f;
+            float folga = largura * 0.35f;
+            float alvo = inicio * 3.6f + largura / 2 + folga * (rand() % 201 - 100) / 100.0f;
+            roleta->anguloFinal = 5 * 360.0f + fmodf(360.0f - alvo, 360.0f);
+            roleta->estado = ROLETA_GIRANDO;
+            return true;
+        }
+        inicio += roleta->chances[i];
+    }
+    return false;
+}
+
+void atualizarRoletaDificuldade(RoletaDificuldade *roleta, float tempoQuadro)
+{
+    // Mesma animação da roleta de categorias.
+    if (roleta->estado == ROLETA_GIRANDO)
+    {
+        roleta->tempoGiro += tempoQuadro;
+        if (roleta->tempoGiro >= DURACAO_GIRO)
+        {
+            roleta->angulo = roleta->anguloFinal;
+            roleta->estado = ROLETA_RESULTADO;
+        }
+        else
+        {
+            double restante = 1.0 - roleta->tempoGiro / DURACAO_GIRO;
+            roleta->angulo = (float)(roleta->anguloFinal * (1.0 - restante * restante * restante));
+        }
+    }
+    else if (roleta->estado == ROLETA_RESULTADO)
+        roleta->tempoAnuncio = fminf(roleta->tempoAnuncio + tempoQuadro, DURACAO_ANUNCIO);
+}
+
+int variacaoDificuldade(const RoletaDificuldade *roleta)
+{
+    return (int)roleta->resultado - DIF_MANTER;
+}
+
+static void desenharDiscoDificuldade(const RoletaDificuldade *roleta)
+{
+    const Vector2 centro = {400, 267};
+    const float raio = 174.0f;
+    const float giro = fmodf(roleta->angulo, 360.0f);
+    const bool resultado = roleta->estado == ROLETA_RESULTADO;
+    const float transicao = roleta->tempoAnuncio / DURACAO_ANUNCIO;
+    const int total = totalChances(roleta);
+
+    DrawCircleV(centro, raio + 8, COR_FUNDO);
+    float acumulado = 0.0f;
+    for (int i = 0; i < QUANTIDADE_OPCOES_DIF; i++)
+    {
+        if (roleta->chances[i] == 0)
+            continue;
+        float largura = roleta->chances[i] * 360.0f / total;
+        float inicio = ANGULO_PONTEIRO + acumulado + giro;
+        float fim = inicio + largura;
+        float meio = inicio + largura / 2;
+        acumulado += largura;
+
+        bool escolhido = resultado && roleta->resultado == (OpcaoDificuldade)i;
+        float brilho = resultado ? (escolhido ? 0.16f * transicao : -0.64f * transicao) : 0.0f;
+        DrawCircleSector(centro, raio, inicio, fim, 32, ColorBrightness(opcoesDificuldade[i].cor, brilho));
+        DrawCircleSectorLines(centro, raio, inicio, fim, 32, COR_DOURADO);
+        if (escolhido)
+            DrawRing(centro, raio - 7, raio - 2, inicio + 2, fim - 2, 32, Fade(COR_CLARO, transicao));
+
+        float angulo = meio * GRAUS_EM_RADIANOS;
+        int x = (int)(centro.x + cosf(angulo) * 112);
+        int y = (int)(centro.y + sinf(angulo) * 112);
+        Color cor = ColorBrightness(COR_CLARO, fminf(brilho, 0.0f) * 0.6f);
+        textoCentradoEm(opcoesDificuldade[i].nome, x, y - 20, 17, cor);
+        textoCentradoEm(opcoesDificuldade[i].efeito, x, y, 14, cor);
+        textoCentradoEm(TextFormat("%d%%", roleta->chances[i] * 100 / total), x, y + 16, 14, cor);
+    }
+
+    DrawCircleLines((int)centro.x, (int)centro.y, raio + 5, COR_DOURADO);
+    DrawCircleV(centro, 38, COR_DOURADO);
+    DrawCircleV(centro, 35, COR_AZUL);
+    textoCentradoEm(TextFormat("%d", roleta->base), (int)centro.x, (int)centro.y - 18, 36, COR_CLARO);
+    desenharPonteiro();
+}
+
+AcaoRoleta desenharRoletaDificuldade(const RoletaDificuldade *roleta)
+{
+    desenharFundo();
+    textoCentralizado("ROLETA DE DIFICULDADE", 33, 26, COR_DOURADO);
+    desenharDiscoDificuldade(roleta);
+
+    // Explicação curta das regras nas laterais.
+    DrawText("DIMINUIR", 34, 150, 16, opcoesDificuldade[DIF_DIMINUIR].cor);
+    DrawText("Pergunta mais", 34, 170, 14, COR_CLARO);
+    DrawText("fácil, prêmio", 34, 186, 14, COR_CLARO);
+    DrawText("normal.", 34, 202, 14, COR_CLARO);
+    DrawText("AUMENTAR", 34, 300, 16, ColorBrightness(opcoesDificuldade[DIF_AUMENTAR].cor, 0.4f));
+    DrawText("Pergunta mais", 34, 320, 14, COR_CLARO);
+    DrawText("difícil. Acertou:", 34, 336, 14, COR_CLARO);
+    DrawText("+50% de bônus", 34, 352, 14, COR_DOURADO);
+    DrawText("por nível.", 34, 368, 14, COR_CLARO);
+    DrawText("Uma vez", 652, 230, 16, COR_DOURADO);
+    DrawText("por rodada.", 652, 250, 16, COR_DOURADO);
+
+    if (roleta->estado == ROLETA_RESULTADO)
+    {
+        float progresso = roleta->tempoAnuncio / DURACAO_ANUNCIO;
+        float suavizado = progresso * progresso * (3.0f - 2.0f * progresso);
+        int deslocamento = (int)((1.0f - suavizado) * 9);
+        Dificuldade nova = (Dificuldade)(roleta->base + variacaoDificuldade(roleta));
+        textoCentralizado(TextFormat("NÍVEL %d  ->  %d", roleta->base, nova), 456 + deslocamento, 18,
+                          Fade(COR_CLARO, suavizado));
+        textoCentralizado(nomeDificuldade(nova), 479 + deslocamento, 32, Fade(COR_DOURADO, suavizado));
+    }
+
+    const Rectangle areaAcao = {202, 526, 396, 40};
+    if (roleta->estado == ROLETA_PRONTA)
+    {
+        // Antes de girar ainda dá para desistir sem gastar a roleta da rodada.
+        if (desenharBotao("VOLTAR", (Rectangle){36, 526, 132, 40}) || IsKeyPressed(KEY_BACKSPACE))
+            return ROLETA_VOLTAR;
+        if (desenharBotao("GIRAR ROLETA", areaAcao))
+            return ROLETA_GIRAR;
+    }
+    else if (roleta->estado == ROLETA_GIRANDO)
+        textoCentralizado("SORTEANDO...", 538, 18, COR_CLARO);
+    else if (roleta->tempoAnuncio >= DURACAO_ANUNCIO && desenharBotao("CONTINUAR", areaAcao))
         return ROLETA_PROSSEGUIR;
 
     return ROLETA_NENHUMA_ACAO;

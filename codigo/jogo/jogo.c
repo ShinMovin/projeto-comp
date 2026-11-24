@@ -17,7 +17,9 @@ static const float duracaoRevelacao = 1.55f;
 
 static void conquistarRodada(Jogo *jogo)
 {
-    jogo->premio = valorRodada(jogo->rodada);
+    // Diminuir não tira nada; aumentar soma um bônus que acompanha o prêmio até o fim.
+    jogo->bonus += bonusDificuldade(jogo->rodada, dificuldadeRodada(jogo->rodada), jogo->dificuldade);
+    jogo->premio = valorRodada(jogo->rodada) + jogo->bonus;
     if (rodadaTemCheckpoint(jogo->rodada))
     {
         jogo->premioGarantido = jogo->premio;
@@ -141,6 +143,7 @@ bool avancarRodada(Jogo *jogo)
     jogo->resposta = '\0';
     jogo->respostaBloqueada = '\0';
     jogo->segundaChance = false;
+    jogo->girouDificuldade = false;
     for (int i = 0; i < 4; i++)
         jogo->eliminadas[i] = false;
     jogo->tempoEstado = 0.0f;
@@ -210,4 +213,22 @@ bool concluirAjuda(Jogo *jogo, const Pergunta *pergunta, ResultadoMinigame resul
     default:
         return false;
     }
+}
+
+bool podeGirarDificuldade(const Jogo *jogo)
+{
+    return jogo->estado == SORTEA && !jogo->girouDificuldade;
+}
+
+void aplicarDificuldade(Jogo *jogo, int variacao)
+{
+    if (!podeGirarDificuldade(jogo))
+        return;
+    int nova = (int)dificuldadeRodada(jogo->rodada) + variacao;
+    if (nova < MUITO_FACIL)
+        nova = MUITO_FACIL;
+    if (nova > IMPOSSIVEL)
+        nova = IMPOSSIVEL;
+    jogo->dificuldade = (Dificuldade)nova;
+    jogo->girouDificuldade = true;
 }

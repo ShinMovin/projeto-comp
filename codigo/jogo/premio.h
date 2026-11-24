@@ -27,4 +27,21 @@ int valorRodada(int rodada);
 /** @brief Indica se concluir esta rodada (índice de 0 a 14) garante um prêmio. */
 bool rodadaTemCheckpoint(int rodada);
 
+/** @brief Resultados possíveis da roleta de dificuldade. */
+typedef enum { DIF_DIMINUIR, DIF_MANTER, DIF_AUMENTAR, QUANTIDADE_OPCOES_DIF } OpcaoDificuldade;
+
+/**
+ * @brief Chances, em porcentagem, de cada opção da roleta de dificuldade.
+ * Diminuir começa em 10% e cai até 3%; aumentar sobe de 15% até 50%.
+ * @param rodada rodada de 0 a 14
+ * @param chances vetor preenchido com DIF_DIMINUIR, DIF_MANTER e DIF_AUMENTAR (soma 100)
+ */
+void chancesDificuldade(int rodada, int chances[QUANTIDADE_OPCOES_DIF]);
+
+/**
+ * @brief Bônus por acertar com a dificuldade aumentada: metade do valor da rodada por nível acima.
+ * @return zero se a dificuldade não foi aumentada
+ */
+int bonusDificuldade(int rodada, Dificuldade base, Dificuldade final);
+
 #endif

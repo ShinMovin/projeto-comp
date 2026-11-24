@@ -200,7 +200,13 @@ static void desenharCabecalho(const Jogo *jogo)
 
     DrawText(nomeCategoria(jogo->categoria), 123, 41, 30, COR_CLARO);
     DrawText(TextFormat("PERGUNTA %02d/%02d", jogo->rodada + 1, TOTAL_RODADAS), 124, 80, 16, COR_DOURADO);
-    DrawText(TextFormat("NÍVEL %d/%d", jogo->dificuldade, IMPOSSIVEL), 295, 80, 16, corLegenda);
+    Dificuldade base = dificuldadeRodada(jogo->rodada);
+    if (jogo->dificuldade == base)
+        DrawText(TextFormat("NÍVEL %d/%d", jogo->dificuldade, IMPOSSIVEL), 295, 80, 16, corLegenda);
+    else
+        // Mostra que o nível veio da roleta: verde se diminuiu, dourado se aumentou.
+        DrawText(TextFormat("NÍVEL %d (%+d)", jogo->dificuldade, jogo->dificuldade - base),
+                 295, 80, 16, jogo->dificuldade < base ? corAcerto : COR_DOURADO);
 
     desenharPremioCabecalho("PRÊMIO ATUAL", jogo->premio, 410, COR_CLARO);
     desenharPremioCabecalho("PRÊMIO GARANTIDO", jogo->premioGarantido, 594, COR_DOURADO);
@@ -329,6 +335,9 @@ AcaoPergunta desenharTelaPergunta(const Jogo *jogo, const Pergunta *pergunta)
     DrawRectangleRec(painel, COR_AZUL);
     DrawRectangleLinesEx(painel, 1, COR_DOURADO);
     DrawText(TextFormat("VALE %s", emReais(valorRodada(jogo->rodada))), 49, 128, 17, COR_DOURADO);
+    int bonus = bonusDificuldade(jogo->rodada, dificuldadeRodada(jogo->rodada), jogo->dificuldade);
+    if (bonus > 0)
+        textoADireita(TextFormat("+ BÔNUS %s", emReais(bonus)), 535, 128, 17, corAcerto);
     DrawLine(49, 152, 535, 152, Fade(COR_DOURADO, 0.50f));
     desenharTextoPergunta(pergunta->conteudo_da_pergunta, (Rectangle){50, 159, 484, 80}, 23, true, COR_CLARO);
 

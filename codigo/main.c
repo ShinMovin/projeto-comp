@@ -29,6 +29,8 @@ typedef struct
     Jogo jogo;
     Roleta roleta;
     const char *avisoRoleta;
+    RoletaDificuldade roletaDificuldade;
+    bool naRoletaDificuldade; // A tela da roleta de dificuldade está aberta por cima da de categorias.
     Desafios ajudas;
 } PartidaGrafica;
 
@@ -36,6 +38,23 @@ static void prepararRoleta(PartidaGrafica *partida, const BancoPerguntas *banco)
 {
     iniciarRoleta(&partida->roleta, banco, partida->jogo.dificuldade);
     partida->avisoRoleta = banco ? NULL : "Não foi possível abrir o banco de perguntas.";
+    partida->naRoletaDificuldade = false;
+}
+
+static void desenharEtapaDificuldade(PartidaGrafica *partida, const BancoPerguntas *banco)
+{
+    RoletaDificuldade *roleta = &partida->roletaDificuldade;
+    AcaoRoleta acao = desenharRoletaDificuldade(roleta);
+    if (acao == ROLETA_VOLTAR)
+        partida->naRoletaDificuldade = false;
+    else if (acao == ROLETA_GIRAR)
+        girarRoletaDificuldade(roleta);
+    else if (acao == ROLETA_PROSSEGUIR)
+    {
+        aplicarDificuldade(&partida->jogo, variacaoDificuldade(roleta));
+        // A roleta de categorias é refeita para considerar as perguntas do novo nível.
+        prepararRoleta(partida, banco);
+    }
 }
 
 static void iniciarPartida(PartidaGrafica *partida, BancoPerguntas *banco)
@@ -75,12 +94,24 @@ static Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
         return TELA_JOGAR;
     }
 
+    if (jogo->estado == SORTEA && partida->naRoletaDificuldade)
+    {
+        desenharEtapaDificuldade(partida, banco);
+        return TELA_JOGAR;
+    }
+
     if (jogo->estado == SORTEA)
     {
-        AcaoRoleta acao = desenharRoleta(&partida->roleta, partida->avisoRoleta);
+        AcaoRoleta acao = desenharRoleta(&partida->roleta, partida->avisoRoleta, jogo->dificuldade,
+                                         podeGirarDificuldade(jogo));
         if (acao == ROLETA_VOLTAR || IsKeyPressed(KEY_BACKSPACE))
             return MENU_PRINCIPAL;
-        if (acao == ROLETA_GIRAR)
+        if (acao == ROLETA_DIFICULDADE)
+        {
+            iniciarRoletaDificuldade(&partida->roletaDificuldade, banco, jogo->rodada);
+            partida->naRoletaDificuldade = true;
+        }
+        else if (acao == ROLETA_GIRAR)
             girarRoleta(&partida->roleta);
         else if (acao == ROLETA_PROSSEGUIR && !selecionarPergunta(jogo, banco, partida->roleta.categoria))
             partida->avisoRoleta = "Sem perguntas inéditas no setor sorteado.";
@@ -162,7 +193,9 @@ static void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool tra
             else
             {
                 atualizarJogo(&partida.jogo, banco, tempoQuadro);
-                if (partida.jogo.estado == SORTEA)
+                if (partida.jogo.estado == SORTEA && partida.naRoletaDificuldade)
+                    atualizarRoletaDificuldade(&partida.roletaDificuldade, tempoQuadro);
+                else if (partida.jogo.estado == SORTEA)
                     atualizarRoleta(&partida.roleta, tempoQuadro);
             }
         }
