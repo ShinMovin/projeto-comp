@@ -267,12 +267,17 @@ bool salvarTerminal(ArquivosBanco *arquivos, BancoPerguntas *banco)
     const char *erro = salvarBancoArquivos(arquivos, banco);
     if (erro)
     {
-        puts(erro);
+        printf("%s\n", erro);
         erro = recarregarBancoArquivos(arquivos, banco);
-        puts(erro ? erro : "A alteração não foi salva. O banco em disco foi recarregado.");
-        return !erro;
+        if (erro)
+        {
+            printf("%s\n", erro);
+            return false;
+        }
+        printf("A alteração não foi salva. O banco em disco foi recarregado.\n");
+        return true;
     }
-    puts("Banco salvo em perguntas.dat.");
+    printf("Banco salvo em perguntas.dat.\n");
     for (int nivel = MUITO_FACIL; nivel <= IMPOSSIVEL; nivel++)
     {
         if (contaPerguntasDistintas(banco, (Dificuldade)nivel) < RODADAS_POR_NIVEL)
@@ -284,7 +289,7 @@ bool salvarTerminal(ArquivosBanco *arquivos, BancoPerguntas *banco)
 void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
 {
     if (arquivos->somenteLeitura)
-        puts("Um arquivo está inválido ou ilegível. Banco aberto para consulta.");
+        printf("Um arquivo está inválido ou ilegível. Banco aberto para consulta.\n");
 
     for (;;)
     {
@@ -305,7 +310,7 @@ void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
         bool mudou = false;
         if (arquivos->somenteLeitura && (opcao == 2 || opcao == 4 || opcao == 5))
         {
-            puts("Corrija o arquivo inválido ou ilegível antes de editar.");
+            printf("Corrija o arquivo inválido ou ilegível antes de editar.\n");
             continue;
         }
 
@@ -322,7 +327,7 @@ void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
             {
                 mudou = adicionaPerguntas(banco, &nova);
                 if (!mudou)
-                    puts("Não foi possível adicionar a pergunta.");
+                    printf("Não foi possível adicionar a pergunta.\n");
             }
             break;
         }
@@ -345,7 +350,7 @@ void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
                 printf("Perguntas exportadas para dados/perguntas_exportadas.csv\n");
             }
             else
-                puts("Falha ao exportar as perguntas.");
+                printf("Falha ao exportar as perguntas.\n");
             break;
 
         case 7:
@@ -380,7 +385,7 @@ int main(int argc, char **argv)
         const char *erro = abrirBancoArquivos(&arquivos, &banco);
         if (erro)
         {
-            puts(erro);
+            printf("%s\n", erro);
             resultado = 1;
         }
         else

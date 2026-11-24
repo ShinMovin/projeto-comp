@@ -1,6 +1,7 @@
 #ifndef BANCO_ARQUIVOS_H
 #define BANCO_ARQUIVOS_H
 
+#include <stdio.h>
 #include "perguntas.h"
 
 enum { CAMINHO_BANCO_MAXIMO = 4096 };
@@ -9,7 +10,7 @@ enum { CAMINHO_BANCO_MAXIMO = 4096 };
 typedef struct
 {
     char pasta[CAMINHO_BANCO_MAXIMO];
-    int trava;               // -1 quando nenhuma sessão está aberta.
+    FILE *trava;             // NULL quando nenhuma sessão está aberta.
     bool somenteLeitura;
 } ArquivosBanco;
 

@@ -105,7 +105,7 @@ Os leitores montam um banco candidato. Só substituem o banco original em memór
 3. Sincronizar e reabrir o temporário. Comparar cada pergunta relida com a que está em memória.
 4. Substituir o DAT ativo de uma vez. Em caso de falha antes da troca, o arquivo anterior continua disponível.
 
-A trava é um arquivo separado porque o DAT troca de nome durante o salvamento. O código usa `flock()`, do Linux, que libera a trava quando o descritor fecha. O código também reconhece o marcador antigo e recupera seu backup se encontrar uma gravação pendente de uma versão anterior. O CSV original é preservado e `--banco` permite exportar um novo CSV.
+A trava é um arquivo separado porque o DAT troca de nome durante o salvamento. `fopen()` abre o arquivo da trava, `flock()` dá acesso exclusivo à sessão e `fclose()` libera a trava. O código também reconhece o marcador antigo e recupera seu backup se encontrar uma gravação pendente de uma versão anterior. O CSV original é preservado e `--banco` permite exportar um novo CSV.
 
 ### UTF-8, pistas e áudio
 

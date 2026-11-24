@@ -278,12 +278,7 @@ bool lerRegistroCsv(const char *linha, Pergunta *pergunta)
     if (categoria < '1' || categoria > '5')
         return false;
 
-    posicao++;
-    if (linha[posicao] == '\r')
-        posicao++;
-    if (linha[posicao] == '\n')
-        posicao++;
-    if (linha[posicao] != '\0')
+    if (linha[posicao + 1] != '\0')
         return false;
 
     pergunta->alternativa_correta = correta;
@@ -307,17 +302,22 @@ int concluirLeitura(BancoPerguntas *banco, BancoPerguntas *novo, bool ok)
 int lerLinhaCsv(FILE *arq, char *linha, size_t capacidade)
 {
     size_t tamanho = 0;
-    int c;
-    while ((c = fgetc(arq)) != EOF)
+    int c = fgetc(arq);
+    if (c == EOF)
+        return ferror(arq) ? -1 : 0;
+
+    while (c != EOF && c != '\n')
     {
         if (c == '\0' || tamanho + 1 >= capacidade)
             return -1;
         linha[tamanho++] = (char)c;
-        if (c == '\n')
-            break;
+        c = fgetc(arq);
     }
+    // O restante da leitura recebe só o conteúdo, com CRLF ou LF.
+    if (tamanho > 0 && linha[tamanho - 1] == '\r')
+        tamanho--;
     linha[tamanho] = '\0';
-    return ferror(arq) ? -1 : tamanho > 0;
+    return ferror(arq) ? -1 : 1;
 }
 
 int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq)
@@ -328,12 +328,8 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq)
         return 0;
     BancoPerguntas novo;
     char linha[1200] = {0};
-    bool ok = inicializaBanco(&novo) && lerLinhaCsv(arq, linha, sizeof linha) > 0;
-    if (ok)
-    {
-        linha[strcspn(linha, "\r\n")] = '\0';
-        ok = strcmp(linha, cabecalhoCsv) == 0;
-    }
+    bool ok = inicializaBanco(&novo) && lerLinhaCsv(arq, linha, sizeof linha) > 0 &&
+              strcmp(linha, cabecalhoCsv) == 0;
 
     int lida = 0;
     while (ok && (lida = lerLinhaCsv(arq, linha, sizeof linha)) > 0)
@@ -416,7 +412,9 @@ int lerLinhaTerminal(char *texto, size_t capacidade)
 {
     if (!fgets(texto, (int)capacidade, stdin))
         return 0;
-    size_t fim = strcspn(texto, "\r\n");
+    int fim = 0;
+    while (texto[fim] && texto[fim] != '\r' && texto[fim] != '\n')
+        fim++;
     if (texto[fim] == '\0' && !feof(stdin))
     {
         int c;
@@ -437,18 +435,18 @@ bool lerTextoTerminal(const char *rotulo, char *destino)
         if (leitura == 0)
             return false;
         if (leitura < 0 || strlen(texto) > LIMITE_TEXTO_PERGUNTA)
-            puts("Texto muito grande. Use até 200 bytes.");
+            printf("Texto muito grande. Use até 200 bytes.\n");
         else if (texto[0] == '\0')
-            puts("O texto não pode ser vazio.");
+            printf("O texto não pode ser vazio.\n");
         else if (strchr(texto, '"'))
-            puts("Não use aspas no texto.");
+            printf("Não use aspas no texto.\n");
         else if (textoValido(texto))
         {
             strcpy(destino, texto);
             return true;
         }
         else
-            puts("Digite um texto válido em UTF-8.");
+            printf("Digite um texto válido em UTF-8.\n");
     }
 }
 
@@ -463,14 +461,35 @@ int lerNumeroTerminal(const char *rotulo, int minimo, int maximo, bool repetir)
             return -1;
         if (leitura > 0)
         {
-            char *fim;
-            long valor = strtol(linha, &fim, 10);
-            while (isspace((unsigned char)*fim))
-                fim++;
-            if (fim != linha && *fim == '\0' && valor >= minimo && valor <= maximo)
-                return (int)valor;
+            int i = 0;
+            while (isspace((unsigned char)linha[i]))
+                i++;
+            bool negativo = linha[i] == '-';
+            if (negativo || linha[i] == '+')
+                i++;
+
+            int inicio = i;
+            int valor = 0;
+            while (linha[i] >= '0' && linha[i] <= '9')
+            {
+                int digito = linha[i] - '0';
+                // Testa o limite antes de multiplicar e somar o próximo dígito.
+                if (valor > (INT_MAX - digito) / 10)
+                    break;
+                valor = valor * 10 + digito;
+                i++;
+            }
+            if (i > inicio)
+            {
+                while (isspace((unsigned char)linha[i]))
+                    i++;
+                if (negativo)
+                    valor = -valor;
+                if (linha[i] == '\0' && valor >= minimo && valor <= maximo)
+                    return valor;
+            }
         }
-        puts("Número inválido.");
+        printf("Número inválido.\n");
     } while (repetir);
     return -1;
 }
@@ -514,7 +533,7 @@ int lerPergunta(Pergunta *pergunta, bool editando)
             if (nova.alternativa_correta >= 'A' && nova.alternativa_correta <= 'D')
                 break;
         }
-        puts("Alternativa inválida.");
+        printf("Alternativa inválida.\n");
     }
 
     int dificuldade = lerNumeroTerminal(
@@ -545,7 +564,7 @@ int listaPergunta(BancoPerguntas *banco)
 {
     if (banco->quantidade == 0)
     {
-        puts("Nenhuma pergunta cadastrada!");
+        printf("Nenhuma pergunta cadastrada!\n");
         return 0;
     }
     for (int i = 0; i < banco->quantidade; i++)
@@ -557,7 +576,7 @@ int pesquisaPergunta(BancoPerguntas *banco)
 {
     if (banco->quantidade == 0)
     {
-        puts("Ainda não existem perguntas no programa!");
+        printf("Ainda não existem perguntas no programa!\n");
         return 0;
     }
 
@@ -565,7 +584,7 @@ int pesquisaPergunta(BancoPerguntas *banco)
     printf("Digite o enunciado ou um trecho da pergunta que deseja encontrar: ");
     if (lerLinhaTerminal(texto, sizeof texto) <= 0 || !texto[0])
     {
-        puts("Busca inválida!");
+        printf("Busca inválida!\n");
         return 0;
     }
     int encontradas = 0;
@@ -578,7 +597,7 @@ int pesquisaPergunta(BancoPerguntas *banco)
         }
     }
     if (encontradas == 0)
-        puts("Não foram encontradas perguntas relacionadas à sua busca!");
+        printf("Não foram encontradas perguntas relacionadas à sua busca!\n");
     return encontradas;
 }
 
@@ -586,7 +605,7 @@ int excluiPergunta(BancoPerguntas *banco)
 {
     if (banco->quantidade == 0)
     {
-        puts("O programa não possui perguntas!");
+        printf("O programa não possui perguntas!\n");
         return 0;
     }
     int numero = lerNumeroTerminal("Digite o índice da pergunta a ser removida (0 cancela)", 0, banco->quantidade, false);
@@ -597,7 +616,7 @@ int alteraPergunta(BancoPerguntas *banco)
 {
     if (banco->quantidade == 0)
     {
-        puts("O programa não possui perguntas para serem alteradas!");
+        printf("O programa não possui perguntas para serem alteradas!\n");
         return 0;
     }
     int numero = lerNumeroTerminal("Digite o número da pergunta (0 cancela)", 0, banco->quantidade, false);

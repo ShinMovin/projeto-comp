@@ -1,7 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "banco_arquivos.h"
 #include <errno.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/file.h>
@@ -18,7 +17,7 @@ void montarCaminhoBanco(char caminho[CAMINHO_BANCO_MAXIMO], const ArquivosBanco 
 
 bool inicializarArquivosBanco(ArquivosBanco *arquivos, const char *pasta)
 {
-    *arquivos = (ArquivosBanco){.trava = -1};
+    *arquivos = (ArquivosBanco){0};
     if (strlen(pasta) >= sizeof arquivos->pasta - 32)
         return false;
     strcpy(arquivos->pasta, pasta);
@@ -27,10 +26,10 @@ bool inicializarArquivosBanco(ArquivosBanco *arquivos, const char *pasta)
 
 void fecharBancoArquivos(ArquivosBanco *arquivos)
 {
-    if (arquivos->trava >= 0)
+    if (arquivos->trava)
     {
-        close(arquivos->trava);
-        arquivos->trava = -1;
+        fclose(arquivos->trava);
+        arquivos->trava = NULL;
     }
 }
 
@@ -51,18 +50,26 @@ bool gravarDatTemporario(const BancoPerguntas *banco, const char *caminho)
     if (!arquivo)
         return false;
 
-    // Confere o arquivo recém-gravado uma pergunta por vez.
+    // Pede ao sistema que conclua a gravação antes de conferir o arquivo.
+    if (fsync(fileno(arquivo)) != 0)
+    {
+        fclose(arquivo);
+        return false;
+    }
     int quantidade = 0;
-    bool ok = fsync(fileno(arquivo)) == 0 &&
-              fread(&quantidade, sizeof quantidade, 1, arquivo) == 1 && quantidade == banco->quantidade;
+    bool ok = fread(&quantidade, sizeof quantidade, 1, arquivo) == 1 &&
+              quantidade == banco->quantidade;
     for (int i = 0; ok && i < quantidade; i++)
     {
         Pergunta pergunta;
         ok = fread(&pergunta, sizeof pergunta, 1, arquivo) == 1 &&
              !validarPergunta(&pergunta) && perguntasIguais(&pergunta, &banco->perguntas[i]);
     }
-    ok = ok && fgetc(arquivo) == EOF && !ferror(arquivo);
-    return fclose(arquivo) == 0 && ok;
+    if (ok && (fgetc(arquivo) != EOF || ferror(arquivo)))
+        ok = false;
+    if (fclose(arquivo) != 0)
+        return false;
+    return ok;
 }
 
 bool recuperarGravacaoAntiga(const ArquivosBanco *arquivos)
@@ -80,7 +87,9 @@ bool recuperarGravacaoAntiga(const ArquivosBanco *arquivos)
     int csv = fgetc(arquivo);
     int dat = fgetc(arquivo);
     bool valido = fgetc(arquivo) == EOF && !ferror(arquivo);
-    if (fclose(arquivo) != 0 || !valido || (csv != '0' && csv != '1') || (dat != '0' && dat != '1'))
+    if (fclose(arquivo) != 0 || !valido)
+        return false;
+    if ((csv != '0' && csv != '1') || (dat != '0' && dat != '1'))
         return false;
 
     char destino[CAMINHO_BANCO_MAXIMO];
@@ -91,10 +100,11 @@ bool recuperarGravacaoAntiga(const ArquivosBanco *arquivos)
         montarCaminhoBanco(backup, arquivos, ".banco-dat.anterior");
         montarCaminhoBanco(temp, arquivos, ".banco-dat.novo");
         BancoPerguntas anterior = {0};
-        bool restaurado = carregaBinario(&anterior, backup) && gravarDatTemporario(&anterior, temp) &&
-                          rename(temp, destino) == 0;
+        if (!carregaBinario(&anterior, backup))
+            return false;
+        bool gravado = gravarDatTemporario(&anterior, temp);
         liberaBancoPergunta(&anterior);
-        if (!restaurado)
+        if (!gravado || rename(temp, destino) != 0)
             return false;
     }
     else if (remove(destino) != 0 && errno != ENOENT)
@@ -114,7 +124,7 @@ bool recuperarGravacaoAntiga(const ArquivosBanco *arquivos)
 
 const char *recarregarBancoArquivos(ArquivosBanco *arquivos, BancoPerguntas *banco)
 {
-    if (arquivos->trava < 0 || !recuperarGravacaoAntiga(arquivos))
+    if (!arquivos->trava || !recuperarGravacaoAntiga(arquivos))
         return "Não foi possível recuperar os arquivos do banco.";
 
     char localCsv[CAMINHO_BANCO_MAXIMO], localDat[CAMINHO_BANCO_MAXIMO];
@@ -151,24 +161,26 @@ const char *abrirBancoArquivos(ArquivosBanco *arquivos, BancoPerguntas *banco)
     // A trava fica num arquivo separado porque o DAT muda de nome ao salvar.
     char caminho[CAMINHO_BANCO_MAXIMO];
     montarCaminhoBanco(caminho, arquivos, ".banco-lock");
-    int trava = open(caminho, O_CREAT | O_RDWR, 0666);
-    if (trava < 0)
-        return "Banco em uso ou sem acesso. Feche a outra sessão e tente novamente.";
-    if (flock(trava, LOCK_EX | LOCK_NB) != 0)
+    FILE *trava = fopen(caminho, "a+b");
+    if (trava)
     {
-        close(trava);
-        return "Banco em uso ou sem acesso. Feche a outra sessão e tente novamente.";
+        // fileno dá a flock o número do arquivo que fopen abriu.
+        if (flock(fileno(trava), LOCK_EX | LOCK_NB) == 0)
+        {
+            arquivos->trava = trava;
+            const char *erro = recarregarBancoArquivos(arquivos, banco);
+            if (erro)
+                fecharBancoArquivos(arquivos);
+            return erro;
+        }
+        fclose(trava);
     }
-    arquivos->trava = trava;
-    const char *erro = recarregarBancoArquivos(arquivos, banco);
-    if (erro)
-        fecharBancoArquivos(arquivos);
-    return erro;
+    return "Banco em uso ou sem acesso. Feche a outra sessão e tente novamente.";
 }
 
 const char *salvarBancoArquivos(ArquivosBanco *arquivos, const BancoPerguntas *banco)
 {
-    if (arquivos->trava < 0 || !recuperarGravacaoAntiga(arquivos))
+    if (!arquivos->trava || !recuperarGravacaoAntiga(arquivos))
         return "Não foi possível recuperar os arquivos antes de salvar.";
     if (arquivos->somenteLeitura)
         return "Há um arquivo inválido ou ilegível. Os originais foram preservados.";
