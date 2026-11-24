@@ -36,11 +36,15 @@ else
     LIBS = -lraylib $(LIBS_SISTEMA)
 endif
 
-# Jogo principal (menu de perguntas)
-# Quando criar um .c novo do jogo, acrescente o nome dele aqui
-FONTES = main.c perguntas.c jogo.c premio.c desenho.c interface.c roleta.c banco_arquivos.c interface_banco.c \
-    interface_ajudas.c minigames/minigame.c $(GUITARHERO_FONTES) $(TIROALVO_FONTES)
-CABECALHOS = $(wildcard *.h minigames/*.h minigames/*/*.h)
+# Caminhos em relação a codigo/, também usados pelos alvos independentes.
+INCLUDES_PROJETO = -I. -Iinterface -Iperguntas -Ijogo
+DESENHO = interface/desenho.c
+FONTES = main.c $(DESENHO) \
+    interface/interface.c interface/interface_ajudas.c interface/interface_banco.c \
+    perguntas/perguntas.c perguntas/banco_arquivos.c \
+    jogo/jogo.c jogo/premio.c jogo/roleta.c \
+    minigames/minigame.c $(GUITARHERO_FONTES) $(TIROALVO_FONTES)
+CABECALHOS = $(wildcard *.h interface/*.h perguntas/*.h jogo/*.h minigames/*.h minigames/*/*.h)
 JOGO = $(PASTA)/jogo$(EXT)
 
 # Os alvos independentes reaproveitam os mesmos módulos do jogo principal.
@@ -70,16 +74,16 @@ endif
 
 $(JOGO): $(FONTES) $(CABECALHOS) Makefile $(RAYLIB_ARQUIVO) | $(GUITARHERO_AUDIO) $(TIROALVO_AUDIO)
 	mkdir -p "$(PASTA)"
-	$(CC) $(CPPFLAGS) $(RAYLIB_CFLAGS) $(CFLAGS) $(FONTES) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
+	$(CC) $(CPPFLAGS) $(INCLUDES_PROJETO) $(RAYLIB_CFLAGS) $(CFLAGS) $(FONTES) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
 
 run: $(JOGO)
 	$(JOGO)
 
 guitarhero: $(GUITARHERO)
 
-$(GUITARHERO): $(GUITARHERO_FONTES) desenho.c $(CABECALHOS) Makefile $(RAYLIB_ARQUIVO) | $(GUITARHERO_AUDIO)
+$(GUITARHERO): $(GUITARHERO_FONTES) $(DESENHO) $(CABECALHOS) Makefile $(RAYLIB_ARQUIVO) | $(GUITARHERO_AUDIO)
 	mkdir -p "$(PASTA)"
-	$(CC) -std=c99 -DGUITARHERO_INDEPENDENTE $(CPPFLAGS) $(RAYLIB_CFLAGS) $(CFLAGS) $(GUITARHERO_FONTES) desenho.c $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
+	$(CC) -std=c99 -DGUITARHERO_INDEPENDENTE $(CPPFLAGS) $(INCLUDES_PROJETO) $(RAYLIB_CFLAGS) $(CFLAGS) $(GUITARHERO_FONTES) $(DESENHO) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
 
 $(PASTA)/guitarhero-musicas/%: minigames/guitarhero/guitarhero-musicas/%
 	mkdir -p "$(@D)"
@@ -90,9 +94,9 @@ run-guitarhero: $(GUITARHERO)
 
 tiroalvo: $(TIROALVO)
 
-$(TIROALVO): $(TIROALVO_FONTES) desenho.c $(CABECALHOS) Makefile $(RAYLIB_ARQUIVO) | $(TIROALVO_AUDIO)
+$(TIROALVO): $(TIROALVO_FONTES) $(DESENHO) $(CABECALHOS) Makefile $(RAYLIB_ARQUIVO) | $(TIROALVO_AUDIO)
 	mkdir -p "$(PASTA)"
-	$(CC) -std=c99 -DTIROALVO_INDEPENDENTE $(CPPFLAGS) $(RAYLIB_CFLAGS) $(CFLAGS) $(TIROALVO_FONTES) desenho.c $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
+	$(CC) -std=c99 -DTIROALVO_INDEPENDENTE $(CPPFLAGS) $(INCLUDES_PROJETO) $(RAYLIB_CFLAGS) $(CFLAGS) $(TIROALVO_FONTES) $(DESENHO) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
 
 $(PASTA)/audio-tiroalvo/%: minigames/tiroalvo/audio/%
 	mkdir -p "$(@D)"

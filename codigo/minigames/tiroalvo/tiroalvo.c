@@ -1,5 +1,5 @@
 #include "tiroalvo.h"
-#include "../../desenho.h"
+#include "desenho.h"
 #include <math.h>
 #include <stddef.h>
 #include <stdlib.h>
