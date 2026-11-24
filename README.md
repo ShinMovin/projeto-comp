@@ -20,7 +20,27 @@ Para abrir o jogo, use o comando abaixo. Ele também compila o necessário antes
 make run
 ```
 
-Para abrir o gerenciamento pelo terminal, execute `./compilado/jogo --banco`.
+Para abrir o gerenciamento pelo terminal, execute `make run ARGS=--banco`. A opção **7 - Jogar** abre a interface gráfica a partir do terminal.
+
+### Roteiro da apresentação
+
+Para demonstrar a criação do DAT preservando os dados do projeto, prepare uma cópia com apenas o CSV. Execute a partir da raiz do repositório.
+
+```bash
+pasta=$(mktemp -d)
+mkdir "$pasta/dados"
+cp -R Makefile codigo "$pasta/"
+cp dados/perguntas.csv "$pasta/dados/"
+cd "$pasta"
+make
+make run ARGS=--banco
+```
+
+1. Na primeira abertura, mostre a mensagem de criação de `dados/perguntas.dat`.
+2. Use **1 - Listar perguntas** e **2 - Cadastrar pergunta**. Liste de novo para ver o número da nova pergunta, depois use **4 - Alterar pergunta** com esse número.
+3. Use **0 - Sair**, mostre o arquivo com `ls -l dados/perguntas.dat` e reabra com `make run ARGS=--banco`.
+4. Use **1 - Listar perguntas** para mostrar a pergunta cadastrada com a alteração.
+5. Use **7 - Jogar**. Escolha **JOGAR**, gire a roleta, prossiga para a pergunta e clique em **PEDIR AJUDA**. Escolha um minigame para demonstrar a ajuda durante a partida.
 
 ### Recursos e banco de perguntas
 
@@ -45,9 +65,9 @@ Cada tentativa de ajuda é consumida ao iniciar o desafio, inclusive se ele for 
 
 Abra **BANCO DE PERGUNTAS** no menu principal para pesquisar, adicionar, editar ou excluir registros. Use **TAB** e **Shift+TAB** para mudar de campo, **Backspace** para apagar e **SALVAR BANCO** para gravar. A opção `--banco` oferece as mesmas operações pelo terminal, além da exportação para `dados/perguntas_exportadas.csv`.
 
-O jogo usa um DAT válido como fonte principal. Quando ainda não existe DAT, tenta gerar um a partir do CSV. Se existir um DAT inválido e o CSV puder ser lido, o banco abre para consulta.
+O jogo usa um DAT válido como fonte principal. Na primeira abertura sem DAT, lê o CSV e cria o arquivo binário. Se o DAT estiver inválido ou a criação falhar, o banco disponível abre para consulta.
 
-O editor e o modo `--banco` salvam as alterações no DAT. O jogo grava e confere um arquivo temporário antes de substituir o DAT ativo. O CSV original fica disponível para importação e o modo terminal pode gerar `dados/perguntas_exportadas.csv`. A trava do banco permanece ativa até o fim da sessão que está usando seus dados.
+O terminal salva após cada cadastro, alteração ou exclusão. No editor gráfico, use **SALVAR BANCO**. Os dois usam `salvaBinario()` para gravar diretamente em `dados/perguntas.dat`. O CSV original fica disponível para importação. A exportação do terminal gera `dados/perguntas_exportadas.csv`.
 
 Cada campo de texto aceita até 200 bytes em UTF-8. O editor avisa se algum nível ficar com menos de três enunciados distintos, necessários para as 15 rodadas.
 

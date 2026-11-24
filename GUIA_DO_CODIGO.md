@@ -8,7 +8,7 @@ O programa combina uma partida de perguntas, um editor do banco de questões e t
 2. Leia `main.c` a partir de `main()`. Siga primeiro a opção **Jogar** e depois a opção `--banco`.
 3. Leia `jogo/jogo.c` e `jogo/premio.c`. Acompanhe a resposta de uma pergunta até o avanço ou a derrota.
 4. Veja `jogo/roleta.c` e as telas em `interface/`. Compare o sorteio com a animação e observe como um clique vira uma ação.
-5. Leia `perguntas/perguntas.c` e depois `perguntas/banco_arquivos.c`. Separe as operações em memória das operações que alteram o disco.
+5. Leia `perguntas/perguntas.c`. Separe as operações em memória das operações que alteram o disco.
 6. Leia `interface/interface_ajudas.c` e `minigames/minigame.c`. Entre em um minigame por suas funções de início, atualização, desenho, placar e encerramento.
 
 ## Onde fica cada parte
@@ -26,7 +26,6 @@ Os caminhos de fontes abaixo são relativos a `codigo/`. Em geral, o `.h` declar
 | `jogo/premio.{c,h}` | Tabela de valores, nível base por rodada, pesos da roleta de dificuldade e teto do prêmio. |
 | `jogo/roleta.{c,h}` | Seleção das categorias e da variação de dificuldade, animação e desenho das duas roletas. |
 | `perguntas/perguntas.{c,h}` | Tipos do banco, vetores, validação, CRUD, sorteio, leitura e gravação dos formatos. |
-| `perguntas/banco_arquivos.{c,h}` | Localiza CSV e DAT, mantém a trava e coordena o salvamento e a recuperação. |
 | `minigames/minigame.{c,h}` | Define os tipos, resultados e placares e escolhe com `switch` a função de cada minigame. |
 | `minigames/guitarhero/guitarhero.{c,h}` | Relógio da faixa, notas simples e sustentadas, precisão, combo e sincronização de áudio. |
 | `minigames/guitarhero/mapas.h` | Vetores de notas. Cada linha relevante contém tempo de início, duração e trilha. |
@@ -40,7 +39,6 @@ Na raiz, `dados/` guarda o CSV inicial e o DAT ativo. `compilado/` recebe os exe
 
 - **`Pergunta`** contém o enunciado, quatro alternativas, o gabarito, a categoria e a dificuldade. `Categoria` e `Dificuldade` são enums com valores de 1 a 5. O texto de cada campo tem até 200 bytes mais o terminador `'\0'`.
 - **`BancoPerguntas`** guarda `quantidade`, `capacidade` e os endereços de dois vetores. `perguntas[i]` guarda o conteúdo. `usadas[i]` indica se aquela posição saiu na partida. A mesma posição identifica a pergunta nos dois vetores.
-- **`ArquivosBanco`** guarda a pasta, a trava do sistema e o modo de consulta. Esse estado pertence à sessão que abriu o banco.
 - **`Jogo`** guarda o estado da partida, a rodada de 0 a 14, o nível atual, o índice da pergunta, a letra escolhida, o prêmio, o bônus e o checkpoint. Os vetores de ajudas e alternativas usam o enum ou a letra como índice.
 - **`Tela` e `Estado`** representam decisões diferentes. A tela principal pode ser o editor ou a partida. Dentro da partida, o estado permite decidir entre sortear, mostrar pergunta, confirmar, revelar, avançar ou mostrar o resultado.
 - **`Roleta`** guarda os tempos, os ângulos, os pesos e a posição sorteada. Quando `deDificuldade` é verdadeiro, a posição indica diminuir, manter ou aumentar o nível. No sorteio de categorias, ela indica uma das cinco categorias.
@@ -49,17 +47,17 @@ Na raiz, `dados/` guarda o CSV inicial e o DAT ativo. `compilado/` recebe os exe
 
 ## Da entrada ao encerramento
 
-1. **Entrada.** `main(argc, argv)` inicializa o banco vazio, define a semente do sorteio e verifica o argumento `--banco`. No terminal, abre o banco, imprime as opções e reage à opção digitada. Na interface, `menuGrafico()` abre a janela e inicia o áudio.
+1. **Entrada.** `main(argc, argv)` define a semente do sorteio, carrega o banco e verifica o argumento `--banco`. O terminal imprime as opções e reage à opção digitada. `menuGrafico()` abre a janela e inicia o áudio.
 2. **Quadro.** O laço verifica saída, usa `GetFrameTime()` para atualizar a partida ou o treino e chama a tela correspondente entre `BeginDrawing()` e `EndDrawing()`. `atualizarPartida()` mantém o relógio da pergunta parado enquanto há uma ajuda em andamento.
 3. **Início da partida.** `iniciarPartida()` chama `iniciarJogo()` para zerar o estado e limpar o uso das perguntas. `prepararRoleta()` monta a lista das categorias possíveis para o nível atual.
 4. **Escolha e resposta.** Depois da roleta, `selecionarPergunta()` pede a `sorteaPergunta()` um índice válido. `desenharTelaPergunta()` devolve uma ação como escolher ou confirmar. `atualizarJogo()` julga a letra depois da espera definida para o suspense.
 5. **Continuação.** `conquistarRodada()` atualiza bônus e prêmio. `avancarRodada()` prepara a próxima pergunta e decide se deve mostrar o novo nível. Um erro com segunda chance volta à pergunta. Um erro definitivo conserva o prêmio garantido.
-6. **Encerramento.** Ao sair da partida ou do editor, a sessão gráfica devolve a trava que obteve. Quando a interface foi aberta pelo terminal, a trava continua com o terminal. Ao fechar, os minigames liberam suas sessões, a Raylib fecha áudio e janela, e `liberaBancoPergunta()` libera os vetores do banco.
+6. **Encerramento.** Ao fechar a interface, os minigames liberam suas sessões e a Raylib fecha o áudio e a janela. Ao sair do programa, `liberaBancoPergunta()` libera os vetores do banco.
 
 ### Como um módulo chama outro
 
 - **Clique em uma alternativa.** A tela descobre a letra e retorna uma `AcaoPergunta`. `main.c` passa a letra para `escolherResposta(&jogo, letra)`. A função modifica a instância recebida e muda o estado para confirmação.
-- **Salvar no editor.** O formulário valida o rascunho e chama `adicionaPerguntas()` ou `editarPerguntaPorIndice()`. O botão **Salvar banco** chama `salvarBancoArquivos()`, que usa `salvaBinario()` para escrever o temporário.
+- **Salvar no editor.** O formulário valida o rascunho e chama `adicionaPerguntas()` ou `editarPerguntaPorIndice()`. O botão **Salvar banco** usa `salvaBinario()` para escrever o DAT.
 - **Vencer um minigame.** `atualizarDesafios()` chama `atualizarMinigame(tipo, sessao, segundos)`. O `switch` seleciona a função do minigame. A interface copia o placar e chama `concluirAjuda()` se houver uma partida. O `switch` das recompensas aplica o efeito correspondente.
 
 ## Partes para explicar passo a passo
@@ -94,18 +92,13 @@ Ao concluir as perguntas 3, 6, 9 e 12, `conquistarRodada()` copia o prêmio atua
 
 A ajuda é marcada como usada quando uma sessão começa com sucesso. No treino, a interface passa `NULL` como partida, o que impede a aplicação de uma recompensa. O treino da Travessia tem mapa contínuo até acabarem as vidas.
 
-### CSV, DAT e trava
+### CSV e DAT
 
 O CSV guarda um registro por linha. Campos de texto com vírgula são cercados por aspas. O leitor desloca um índice pela linha para separar campos e depois valida gabarito, dificuldade, categoria e texto. O DAT começa com a quantidade em um `int`, seguida de um vetor de `Pergunta` escrito com `fwrite()`. Seu tamanho precisa concordar com a quantidade registrada. O formato usa o layout binário de C do compilador e foi verificado nas plataformas de compilação do grupo.
 
-Os leitores montam um banco candidato. Só substituem o banco original em memória depois de uma leitura completa e válida. O caminho principal de salvamento usa quatro passos:
+Os leitores montam um banco candidato. Só substituem o banco original em memória depois de uma leitura completa e válida. Na abertura, `abrirBanco()` tenta ler o DAT primeiro. Sem DAT, usa o CSV para criar o binário. Se o DAT existir e a leitura falhar, as perguntas disponíveis no CSV ficam abertas para consulta.
 
-1. Verificar se a sessão tem a trava e se o DAT pode ser editado.
-2. Gravar `.banco-dat.novo` na mesma pasta do DAT ativo.
-3. Sincronizar e reabrir o temporário. Comparar cada pergunta relida com a que está em memória.
-4. Substituir o DAT ativo de uma vez. Em caso de falha antes da troca, o arquivo anterior continua disponível.
-
-A trava é um arquivo separado porque o DAT troca de nome durante o salvamento. `fopen()` abre o arquivo da trava, `flock()` dá acesso exclusivo à sessão e `fclose()` libera a trava. O código também reconhece o marcador antigo e recupera seu backup se encontrar uma gravação pendente de uma versão anterior. O CSV original é preservado e `--banco` permite exportar um novo CSV.
+`salvaBinario()` abre o DAT para escrita com `fopen()`, grava a quantidade e as perguntas com `fwrite()` e fecha com `fclose()`. O terminal salva após uma alteração. O editor gráfico salva quando o usuário pede. Para gerar outro CSV, use a opção de exportar em `--banco`.
 
 ### UTF-8, pistas e áudio
 
@@ -120,7 +113,7 @@ A trava é um arquivo separado porque o DAT troca de nome durante o salvamento. 
 | Por que a primeira pergunta está no índice zero? | Vetores em C começam no índice zero. A tela soma um para mostrar a numeração de 1 a 15. |
 | Como o programa sabe se deve desenhar a roleta ou uma pergunta? | `desenharPartida()` consulta `Jogo.estado`. As etapas comuns da pergunta compartilham a mesma tela. |
 | De onde vem o valor do checkpoint? | É uma cópia do prêmio atual no momento do acerto da rodada de checkpoint. |
-| Por que existe uma trava separada? | O DAT ativo é substituído ao salvar. A trava mantém um endereço estável no disco durante toda a sessão. |
+| Como o cadastro aparece depois de reabrir o jogo? | O terminal grava a pergunta no DAT. Na próxima abertura, `carregaBinario()` monta o vetor a partir dele. |
 | Como é garantido que uma resposta errada não encerre a partida com segunda chance ativa? | `julgarResposta()` consome a chance, guarda a letra bloqueada e retorna ao estado `PERGUNTA`. |
 | Como o programa diferencia ajuda e treino? | A presença do ponteiro para `Jogo` indica que há uma partida em andamento. Treino tem sessão e placar próprios. |
 | Qual é a diferença entre tempo de quadro e tempo total? | `GetFrameTime()` fornece segundos desde o quadro anterior. O código soma esse intervalo ao relógio que está ativo. |

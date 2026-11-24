@@ -1,7 +1,7 @@
 #ifndef INTERFACE_BANCO_H
 #define INTERFACE_BANCO_H
 
-#include "banco_arquivos.h"
+#include "perguntas.h"
 
 typedef enum { EDITOR_CONTINUA, EDITOR_MENU, EDITOR_FECHA } AcaoEditor;
 typedef enum { SEM_CONFIRMACAO, CONFIRMAR_EXCLUSAO, CONFIRMAR_MENU, CONFIRMAR_FECHAR } ConfirmacaoBanco;
@@ -29,6 +29,6 @@ typedef struct
 
 void iniciarEditorBanco(EditorBanco *editor);
 bool editorTemAlteracoes(const EditorBanco *editor);
-AcaoEditor desenharEditorBanco(EditorBanco *editor, ArquivosBanco *arquivos, BancoPerguntas *banco);
+AcaoEditor desenharEditorBanco(EditorBanco *editor, BancoPerguntas *banco, const char *caminhoDat, bool somenteLeitura);
 
 #endif

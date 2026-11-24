@@ -96,7 +96,7 @@ void desenharCampo(const char *texto, const char *vazio, Rectangle area, bool fo
     EndScissorMode();
 }
 
-void desenharAvisos(const EditorBanco *editor, const ArquivosBanco *arquivos, const BancoPerguntas *banco)
+void desenharAvisos(const EditorBanco *editor, const BancoPerguntas *banco, bool somenteLeitura)
 {
     int abaixo[5];
     int quantidade = 0;
@@ -126,8 +126,8 @@ void desenharAvisos(const EditorBanco *editor, const ArquivosBanco *arquivos, co
 
     if (editor->mensagem)
         DrawText(editor->mensagem, 35, 508, 14, editor->erro ? corErroBanco : corSucessoBanco);
-    else if (arquivos->somenteLeitura)
-        DrawText("Um arquivo está inválido ou ilegível. Banco aberto para consulta.", 35, 508, 14, corAvisoBanco);
+    else if (somenteLeitura)
+        DrawText("DAT indisponível para edição. Banco aberto para consulta.", 35, 508, 14, corAvisoBanco);
 }
 
 void abrirFormulario(EditorBanco *editor, const BancoPerguntas *banco, int indice)
@@ -174,14 +174,16 @@ bool aplicarFormulario(EditorBanco *editor, BancoPerguntas *banco)
     return true;
 }
 
-bool salvarEditor(EditorBanco *editor, ArquivosBanco *arquivos, BancoPerguntas *banco)
+bool salvarEditor(EditorBanco *editor, BancoPerguntas *banco, const char *caminhoDat)
 {
     if (rascunhoAlterado(editor) && !aplicarFormulario(editor, banco))
         return false;
-    const char *erro = salvarBancoArquivos(arquivos, banco);
-    mensagem(editor, erro ? erro : "Banco salvo em perguntas.dat.", erro != NULL);
-    if (erro)
+    if (!salvaBinario(banco, caminhoDat))
+    {
+        mensagem(editor, "Não foi possível salvar perguntas.dat.", true);
         return false;
+    }
+    mensagem(editor, "Banco salvo em perguntas.dat.", false);
     editor->alterado = false;
     return true;
 }
@@ -216,7 +218,7 @@ bool passaNosFiltros(const EditorBanco *editor, const Pergunta *p)
            strstr(p->conteudo_da_pergunta, editor->pesquisa) != NULL;
 }
 
-void desenharConsulta(EditorBanco *editor, const ArquivosBanco *arquivos, const BancoPerguntas *banco, bool ativo)
+void desenharConsulta(EditorBanco *editor, const BancoPerguntas *banco, bool somenteLeitura, bool ativo)
 {
     DrawText("BANCO DE PERGUNTAS", 35, 34, 28, COR_DOURADO);
     const char *total = TextFormat("%d perguntas cadastradas", banco->quantidade);
@@ -295,7 +297,7 @@ void desenharConsulta(EditorBanco *editor, const ArquivosBanco *arquivos, const 
 
     const Pergunta *p = editor->selecionada < 0 ? NULL : &banco->perguntas[editor->selecionada];
     desenharDetalhe(p);
-    if (p && !arquivos->somenteLeitura)
+    if (p && !somenteLeitura)
     {
         if (botaoEditor("EDITAR", (Rectangle){367, 443, 188, 35}, ativo))
             abrirFormulario(editor, banco, editor->selecionada);
@@ -402,7 +404,7 @@ void desenharModal(const char *titulo, const char *texto)
     textoCentralizado(texto, 262, 17, COR_CLARO);
 }
 
-AcaoEditor confirmarAcao(EditorBanco *editor, ArquivosBanco *arquivos, BancoPerguntas *banco)
+AcaoEditor confirmarAcao(EditorBanco *editor, BancoPerguntas *banco, const char *caminhoDat)
 {
     if (editor->confirmacao == CONFIRMAR_EXCLUSAO)
     {
@@ -411,7 +413,7 @@ AcaoEditor confirmarAcao(EditorBanco *editor, ArquivosBanco *arquivos, BancoPerg
             editor->confirmacao = SEM_CONFIRMACAO;
         if (desenharBotao("EXCLUIR", (Rectangle){410, 318, 206, 42}))
         {
-            if (!arquivos->somenteLeitura && excluirPerguntaPorIndice(banco, editor->selecionada))
+            if (excluirPerguntaPorIndice(banco, editor->selecionada))
             {
                 editor->selecionada = -1;
                 editor->alterado = true;
@@ -429,26 +431,25 @@ AcaoEditor confirmarAcao(EditorBanco *editor, ArquivosBanco *arquivos, BancoPerg
     if (desenharBotao("SALVAR", (Rectangle){110, 318, 179, 42}))
     {
         editor->confirmacao = SEM_CONFIRMACAO;
-        if (salvarEditor(editor, arquivos, banco))
+        if (salvarEditor(editor, banco, caminhoDat))
             return saida;
     }
     if (desenharBotao("DESCARTAR", (Rectangle){310, 318, 179, 42}))
     {
         editor->confirmacao = SEM_CONFIRMACAO;
-        const char *erro = editor->alterado ? recarregarBancoArquivos(arquivos, banco) : NULL;
-        if (!erro)
+        if (!editor->alterado || carregaBinario(banco, caminhoDat))
         {
             iniciarEditorBanco(editor);
             return saida;
         }
-        mensagem(editor, erro, true);
+        mensagem(editor, "Não foi possível reler perguntas.dat.", true);
     }
     if (desenharBotao("CONTINUAR", (Rectangle){510, 318, 179, 42}))
         editor->confirmacao = SEM_CONFIRMACAO;
     return EDITOR_CONTINUA;
 }
 
-AcaoEditor desenharEditorBanco(EditorBanco *editor, ArquivosBanco *arquivos, BancoPerguntas *banco)
+AcaoEditor desenharEditorBanco(EditorBanco *editor, BancoPerguntas *banco, const char *caminhoDat, bool somenteLeitura)
 {
     desenharFundo();
     bool ativo = editor->confirmacao == SEM_CONFIRMACAO;
@@ -456,9 +457,9 @@ AcaoEditor desenharEditorBanco(EditorBanco *editor, ArquivosBanco *arquivos, Ban
     if (formulario)
         desenharFormulario(editor, ativo);
     else
-        desenharConsulta(editor, arquivos, banco, ativo);
+        desenharConsulta(editor, banco, somenteLeitura, ativo);
 
-    desenharAvisos(editor, arquivos, banco);
+    desenharAvisos(editor, banco, somenteLeitura);
     if (formulario)
     {
         if (botaoEditor("CANCELAR", (Rectangle){35, 531, 194, 37}, ativo))
@@ -477,15 +478,15 @@ AcaoEditor desenharEditorBanco(EditorBanco *editor, ArquivosBanco *arquivos, Ban
                 return EDITOR_MENU;
             editor->confirmacao = CONFIRMAR_MENU;
         }
-        if (!arquivos->somenteLeitura)
+        if (!somenteLeitura)
         {
             if (botaoEditor("ADICIONAR PERGUNTA", (Rectangle){265, 531, 276, 37}, ativo))
                 abrirFormulario(editor, banco, -1);
             if (botaoEditor("SALVAR BANCO", (Rectangle){553, 531, 213, 37}, ativo))
-                salvarEditor(editor, arquivos, banco);
+                salvarEditor(editor, banco, caminhoDat);
         }
     }
     if (!ativo)
-        return confirmarAcao(editor, arquivos, banco);
+        return confirmarAcao(editor, banco, caminhoDat);
     return EDITOR_CONTINUA;
 }

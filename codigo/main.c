@@ -8,6 +8,7 @@
  * @copyright Copyright (c) 2026
  * 
  */
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +19,39 @@
 #include "jogo.h"
 #include "premio.h"
 #include "roleta.h"
+
+// O CSV serve para iniciar o banco quando ainda não existe um DAT.
+bool abrirBanco(BancoPerguntas *banco, const char *caminhoDat, bool *somenteLeitura)
+{
+    FILE *arquivo = fopen(caminhoDat, "rb");
+    bool datAusente = !arquivo && errno == ENOENT;
+    if (arquivo)
+    {
+        fclose(arquivo);
+        if (carregaBinario(banco, caminhoDat))
+            return true;
+    }
+
+    const char *caminhoCsv = TextFormat("%s../dados/perguntas.csv", GetApplicationDirectory());
+    if (!carregaPerguntas(banco, caminhoCsv))
+    {
+        arquivo = fopen(caminhoCsv, "rb");
+        if (arquivo)
+        {
+            fclose(arquivo);
+            return false;
+        }
+        if (!datAusente || errno != ENOENT || !inicializaBanco(banco))
+            return false;
+    }
+
+    // Um DAT existente que falhou na leitura pode conter dados a recuperar.
+    if (datAusente && salvaBinario(banco, caminhoDat))
+        printf("Arquivo binário criado em dados/perguntas.dat.\n");
+    else
+        *somenteLeitura = true;
+    return true;
+}
 
 // Dados da partida e das telas que a acompanham. O banco é compartilhado com o editor.
 typedef struct
@@ -151,8 +185,7 @@ Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
     return TELA_JOGAR;
 }
 
-// Quando chamado pelo terminal, o banco já está aberto e a trava continua com o terminal.
-void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool travaTerminal)
+void menuGrafico(BancoPerguntas *banco, const char *caminhoDat, bool somenteLeitura)
 {
     InitWindow(800, 600, "Jogo do Milhão");
     SetTargetFPS(60);
@@ -189,7 +222,6 @@ void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool travaTermi
         else if (tela == TELA_MINIGAMES)
             atualizarDesafios(&treino, NULL, NULL, tempoQuadro);
 
-        Tela telaAnterior = tela;
         BeginDrawing();
         switch (tela)
         {
@@ -201,7 +233,7 @@ void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool travaTermi
                 abrirDesafios(&treino);
             if (tela == TELA_JOGAR || tela == TELA_BANCO)
             {
-                erroMenu = travaTerminal ? NULL : abrirBancoArquivos(arquivos, banco);
+                erroMenu = banco->perguntas ? NULL : "Não foi possível carregar o banco de perguntas.";
                 if (erroMenu)
                     tela = MENU_PRINCIPAL;
                 else if (tela == TELA_JOGAR)
@@ -222,7 +254,7 @@ void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool travaTermi
 
         case TELA_BANCO:
         {
-            AcaoEditor acao = desenharEditorBanco(&editor, arquivos, banco);
+            AcaoEditor acao = desenharEditorBanco(&editor, banco, caminhoDat, somenteLeitura);
             if (acao != EDITOR_CONTINUA)
                 tela = acao == EDITOR_MENU ? MENU_PRINCIPAL : TELA_SAIR;
             break;
@@ -246,15 +278,8 @@ void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool travaTermi
         }
 
         EndDrawing();
-        // A sessão gráfica só tem a posse do banco durante a partida ou o editor.
-        bool saiuPartida = telaAnterior == TELA_JOGAR && tela != TELA_JOGAR;
-        bool saiuEditor = telaAnterior == TELA_BANCO && tela != TELA_BANCO;
-        if (!travaTerminal && (saiuPartida || saiuEditor))
-            fecharBancoArquivos(arquivos);
     }
 
-    if (!travaTerminal)
-        fecharBancoArquivos(arquivos);
     liberarDesafios(&partida.ajudas);
     liberarDesafios(&treino);
     if (IsAudioDeviceReady())
@@ -262,16 +287,14 @@ void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool travaTermi
     CloseWindow();
 }
 
-bool salvarTerminal(ArquivosBanco *arquivos, BancoPerguntas *banco)
+bool salvarTerminal(BancoPerguntas *banco, const char *caminhoDat)
 {
-    const char *erro = salvarBancoArquivos(arquivos, banco);
-    if (erro)
+    if (!salvaBinario(banco, caminhoDat))
     {
-        printf("%s\n", erro);
-        erro = recarregarBancoArquivos(arquivos, banco);
-        if (erro)
+        printf("Não foi possível salvar perguntas.dat.\n");
+        if (!carregaBinario(banco, caminhoDat))
         {
-            printf("%s\n", erro);
+            printf("Não foi possível reler perguntas.dat.\n");
             return false;
         }
         printf("A alteração não foi salva. O banco em disco foi recarregado.\n");
@@ -286,10 +309,10 @@ bool salvarTerminal(ArquivosBanco *arquivos, BancoPerguntas *banco)
     return true;
 }
 
-void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
+void menuTerminal(BancoPerguntas *banco, const char *caminhoDat, bool somenteLeitura)
 {
-    if (arquivos->somenteLeitura)
-        printf("Um arquivo está inválido ou ilegível. Banco aberto para consulta.\n");
+    if (somenteLeitura)
+        printf("Não foi possível abrir o DAT para edição. Banco aberto para consulta.\n");
 
     for (;;)
     {
@@ -308,7 +331,7 @@ void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
         while ((c = getchar()) != '\n' && c != EOF) {}
 
         bool mudou = false;
-        if (arquivos->somenteLeitura && (opcao == 2 || opcao == 4 || opcao == 5))
+        if (somenteLeitura && (opcao == 2 || opcao == 4 || opcao == 5))
         {
             printf("Corrija o arquivo inválido ou ilegível antes de editar.\n");
             continue;
@@ -354,7 +377,7 @@ void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
             break;
 
         case 7:
-            menuGrafico(banco, arquivos, true);
+            menuGrafico(banco, caminhoDat, somenteLeitura);
             break;
 
         case 0:
@@ -365,7 +388,7 @@ void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
             printf("Opção invalida !\n");
             break;
         }
-        if (mudou && !salvarTerminal(arquivos, banco))
+        if (mudou && !salvarTerminal(banco, caminhoDat))
             return;
     }
 }
@@ -373,28 +396,30 @@ void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
 int main(int argc, char **argv)
 {
     BancoPerguntas banco = {0};
-    ArquivosBanco arquivos;
-    srand((unsigned int)time(NULL));
-    if (!inicializarArquivosBanco(&arquivos, TextFormat("%s../dados", GetApplicationDirectory())))
-        return 1;
-
-    bool terminal = argc > 1 && strcmp(argv[1], "--banco") == 0;
-    int resultado = 0;
-    if (terminal)
+    char caminhoDat[4096];
+    int tamanho = snprintf(caminhoDat, sizeof caminhoDat, "%s../dados/perguntas.dat", GetApplicationDirectory());
+    if (tamanho < 0 || tamanho >= (int)sizeof caminhoDat)
     {
-        const char *erro = abrirBancoArquivos(&arquivos, &banco);
-        if (erro)
+        printf("Caminho do banco inválido.\n");
+        return 1;
+    }
+    srand((unsigned int)time(NULL));
+
+    bool somenteLeitura = false;
+    bool carregouBanco = abrirBanco(&banco, caminhoDat, &somenteLeitura);
+    if (argc > 1 && strcmp(argv[1], "--banco") == 0)
+    {
+        if (!carregouBanco)
         {
-            printf("%s\n", erro);
-            resultado = 1;
+            printf("Não foi possível carregar o banco de perguntas.\n");
+            liberaBancoPergunta(&banco);
+            return 1;
         }
-        else
-            menuTerminal(&banco, &arquivos);
+        menuTerminal(&banco, caminhoDat, somenteLeitura);
     }
     else
-        menuGrafico(&banco, &arquivos, false);
+        menuGrafico(&banco, caminhoDat, somenteLeitura);
 
-    fecharBancoArquivos(&arquivos);
     liberaBancoPergunta(&banco);
-    return resultado;
+    return 0;
 }
