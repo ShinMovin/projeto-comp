@@ -6,6 +6,8 @@
 typedef enum { EDITOR_CONTINUA, EDITOR_MENU, EDITOR_FECHA } AcaoEditor;
 typedef enum { SEM_CONFIRMACAO, CONFIRMAR_EXCLUSAO, CONFIRMAR_MENU, CONFIRMAR_FECHAR } ConfirmacaoBanco;
 
+// O formulário edita um rascunho. "original" permite saber se houve alteração
+// antes de copiar a pergunta para o banco. A gravação no disco é outra ação.
 typedef struct
 {
     char pesquisa[LIMITE_TEXTO_PERGUNTA + 1];

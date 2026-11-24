@@ -24,6 +24,13 @@ Dificuldade dificuldadeRodada(int rodada);
 /** @brief Valor da pergunta na rodada indicada, numerada de 0 a 14. */
 int valorRodada(int rodada);
 
+/**
+ * @brief Calcula o prêmio da rodada (índice de 0 a 14).
+ * @param bonusAcumulado soma dos bônus concedidos pelos acertos da partida
+ * @return valor da rodada mais o bônus, em reais, limitado a R$ 1 milhão
+ */
+int premioComBonus(int rodada, int bonusAcumulado);
+
 /** @brief Indica se concluir esta rodada (índice de 0 a 14) garante um prêmio. */
 bool rodadaTemCheckpoint(int rodada);
 

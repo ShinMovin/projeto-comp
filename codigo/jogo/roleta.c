@@ -24,7 +24,7 @@ static const struct
 void iniciarRoleta(Roleta *roleta, const BancoPerguntas *banco, Dificuldade dificuldade,
                    Categoria bloqueada)
 {
-    *roleta = (Roleta){.estado = ROLETA_PRONTA};
+    *roleta = (Roleta){0};
     if (!banco)
         return;
 
@@ -49,7 +49,7 @@ void iniciarRoleta(Roleta *roleta, const BancoPerguntas *banco, Dificuldade difi
 
 bool girarRoleta(Roleta *roleta)
 {
-    if (roleta->estado != ROLETA_PRONTA || roleta->quantidadeDisponivel == 0)
+    if (roleta->animacao.estado != ROLETA_PRONTA || roleta->quantidadeDisponivel == 0)
         return false;
 
     int sorteado = rand() % roleta->quantidadeDisponivel;
@@ -59,35 +59,41 @@ bool girarRoleta(Roleta *roleta)
         {
             roleta->categoria = setores[i].categoria;
             // O setor zero já começa centralizado no ponteiro. Compensa a posição do setor sorteado.
-            roleta->anguloFinal = 5 * 360.0f + fmodf(360.0f - i * ANGULO_SETOR, 360.0f);
-            roleta->estado = ROLETA_GIRANDO;
+            roleta->animacao.anguloFinal = 5 * 360.0f + fmodf(360.0f - i * ANGULO_SETOR, 360.0f);
+            roleta->animacao.estado = ROLETA_GIRANDO;
             return true;
         }
     }
     return false;
 }
 
-void atualizarRoleta(Roleta *roleta, float tempoQuadro)
+/* O giro desacelera até o ponto sorteado. Só depois começa o anúncio. */
+static void atualizarAnimacao(AnimacaoRoleta *animacao, float tempoQuadro)
 {
-    if (roleta->estado == ROLETA_GIRANDO)
+    if (animacao->estado == ROLETA_GIRANDO)
     {
-        roleta->tempoGiro += tempoQuadro;
-        if (roleta->tempoGiro >= DURACAO_GIRO)
+        animacao->tempoGiro += tempoQuadro;
+        if (animacao->tempoGiro >= DURACAO_GIRO)
         {
-            roleta->angulo = roleta->anguloFinal;
-            roleta->estado = ROLETA_RESULTADO;
+            animacao->angulo = animacao->anguloFinal;
+            animacao->estado = ROLETA_RESULTADO;
         }
         else
         {
             // A curva cúbica começa rápida e chega ao ângulo final com velocidade zero.
-            double restante = 1.0 - roleta->tempoGiro / DURACAO_GIRO;
-            roleta->angulo = (float)(roleta->anguloFinal * (1.0 - restante * restante * restante));
+            double restante = 1.0 - animacao->tempoGiro / DURACAO_GIRO;
+            animacao->angulo = (float)(animacao->anguloFinal * (1.0 - restante * restante * restante));
         }
     }
-    else if (roleta->estado == ROLETA_RESULTADO)
+    else if (animacao->estado == ROLETA_RESULTADO)
     {
-        roleta->tempoAnuncio = fminf(roleta->tempoAnuncio + tempoQuadro, DURACAO_ANUNCIO);
+        animacao->tempoAnuncio = fminf(animacao->tempoAnuncio + tempoQuadro, DURACAO_ANUNCIO);
     }
+}
+
+void atualizarRoleta(Roleta *roleta, float tempoQuadro)
+{
+    atualizarAnimacao(&roleta->animacao, tempoQuadro);
 }
 
 static void desenharPonteiro(void)
@@ -101,9 +107,9 @@ static void desenharDisco(const Roleta *roleta)
 {
     const Vector2 centro = {400, 267};
     const float raio = 174.0f;
-    const float giro = fmodf(roleta->angulo, 360.0f);
-    const bool resultado = roleta->estado == ROLETA_RESULTADO;
-    const float transicao = roleta->tempoAnuncio / DURACAO_ANUNCIO;
+    const float giro = fmodf(roleta->animacao.angulo, 360.0f);
+    const bool resultado = roleta->animacao.estado == ROLETA_RESULTADO;
+    const float transicao = roleta->animacao.tempoAnuncio / DURACAO_ANUNCIO;
 
     DrawCircleV(centro, raio + 8, COR_FUNDO);
     for (int i = 0; i < SETORES_ROLETA; i++)
@@ -169,13 +175,13 @@ AcaoRoleta desenharRoleta(const Roleta *roleta, const char *aviso, Dificuldade d
     textoCentralizado("ROLETA DE CATEGORIAS", 33, 26, COR_DOURADO);
     desenharDisco(roleta);
     // Depois de girar as categorias, a dificuldade já ficou definida para esta pergunta.
-    if (desenharBotaoDificuldade(dificuldade, podeMudarDificuldade && roleta->estado == ROLETA_PRONTA))
+    if (desenharBotaoDificuldade(dificuldade, podeMudarDificuldade && roleta->animacao.estado == ROLETA_PRONTA))
         return ROLETA_DIFICULDADE;
 
-    bool anuncioCompleto = roleta->tempoAnuncio >= DURACAO_ANUNCIO;
-    if (roleta->estado == ROLETA_RESULTADO)
+    bool anuncioCompleto = roleta->animacao.tempoAnuncio >= DURACAO_ANUNCIO;
+    if (roleta->animacao.estado == ROLETA_RESULTADO)
     {
-        float progresso = roleta->tempoAnuncio / DURACAO_ANUNCIO;
+        float progresso = roleta->animacao.tempoAnuncio / DURACAO_ANUNCIO;
         float suavizado = progresso * progresso * (3.0f - 2.0f * progresso);
         int deslocamento = (int)((1.0f - suavizado) * 9);
         textoCentralizado("O TEMA ESCOLHIDO FOI", 456 + deslocamento, 18, Fade(COR_CLARO, suavizado));
@@ -190,9 +196,9 @@ AcaoRoleta desenharRoleta(const Roleta *roleta, const char *aviso, Dificuldade d
         textoCentralizado(aviso, 538, 18, COR_CLARO);
     else if (roleta->quantidadeDisponivel == 0)
         textoCentralizado("Sem perguntas disponíveis nesta dificuldade.", 538, 18, COR_CLARO);
-    else if (roleta->estado == ROLETA_GIRANDO)
+    else if (roleta->animacao.estado == ROLETA_GIRANDO)
         textoCentralizado("SORTEANDO...", 538, 18, COR_CLARO);
-    else if (roleta->estado == ROLETA_PRONTA && desenharBotao("GIRAR ROLETA", areaAcao))
+    else if (roleta->animacao.estado == ROLETA_PRONTA && desenharBotao("GIRAR ROLETA", areaAcao))
         return ROLETA_GIRAR;
     else if (anuncioCompleto && desenharBotao("PROSSEGUIR PARA A PERGUNTA", areaAcao))
         return ROLETA_PROSSEGUIR;
@@ -235,7 +241,7 @@ static int totalChances(const RoletaDificuldade *roleta)
 
 void iniciarRoletaDificuldade(RoletaDificuldade *roleta, const BancoPerguntas *banco, int rodada)
 {
-    *roleta = (RoletaDificuldade){.estado = ROLETA_PRONTA, .base = dificuldadeRodada(rodada)};
+    *roleta = (RoletaDificuldade){.base = dificuldadeRodada(rodada)};
     chancesDificuldade(rodada, roleta->chances);
     // Uma opção sai da roleta se passar do nível 1 a 5 ou se não houver pergunta inédita nela.
     if (!temPerguntasNoNivel(banco, roleta->base - 1))
@@ -247,7 +253,7 @@ void iniciarRoletaDificuldade(RoletaDificuldade *roleta, const BancoPerguntas *b
 bool girarRoletaDificuldade(RoletaDificuldade *roleta)
 {
     int total = totalChances(roleta);
-    if (roleta->estado != ROLETA_PRONTA || total == 0)
+    if (roleta->animacao.estado != ROLETA_PRONTA || total == 0)
         return false;
 
     // Sorteio ponderado: cada opção ocupa uma faixa do tamanho da sua chance.
@@ -259,11 +265,13 @@ bool girarRoletaDificuldade(RoletaDificuldade *roleta)
         {
             roleta->resultado = (OpcaoDificuldade)i;
             // Para em um ponto aleatório dentro do setor, longe das bordas.
-            float largura = roleta->chances[i] * 3.6f;
+            // As opções descartadas deixam o total abaixo de 100. Converte o total real em 360°.
+            float grausPorPeso = 360.0f / total;
+            float largura = roleta->chances[i] * grausPorPeso;
             float folga = largura * 0.35f;
-            float alvo = inicio * 3.6f + largura / 2 + folga * (rand() % 201 - 100) / 100.0f;
-            roleta->anguloFinal = 5 * 360.0f + fmodf(360.0f - alvo, 360.0f);
-            roleta->estado = ROLETA_GIRANDO;
+            float alvo = inicio * grausPorPeso + largura / 2 + folga * (rand() % 201 - 100) / 100.0f;
+            roleta->animacao.anguloFinal = 5 * 360.0f + fmodf(360.0f - alvo, 360.0f);
+            roleta->animacao.estado = ROLETA_GIRANDO;
             return true;
         }
         inicio += roleta->chances[i];
@@ -273,23 +281,7 @@ bool girarRoletaDificuldade(RoletaDificuldade *roleta)
 
 void atualizarRoletaDificuldade(RoletaDificuldade *roleta, float tempoQuadro)
 {
-    // Mesma animação da roleta de categorias.
-    if (roleta->estado == ROLETA_GIRANDO)
-    {
-        roleta->tempoGiro += tempoQuadro;
-        if (roleta->tempoGiro >= DURACAO_GIRO)
-        {
-            roleta->angulo = roleta->anguloFinal;
-            roleta->estado = ROLETA_RESULTADO;
-        }
-        else
-        {
-            double restante = 1.0 - roleta->tempoGiro / DURACAO_GIRO;
-            roleta->angulo = (float)(roleta->anguloFinal * (1.0 - restante * restante * restante));
-        }
-    }
-    else if (roleta->estado == ROLETA_RESULTADO)
-        roleta->tempoAnuncio = fminf(roleta->tempoAnuncio + tempoQuadro, DURACAO_ANUNCIO);
+    atualizarAnimacao(&roleta->animacao, tempoQuadro);
 }
 
 int variacaoDificuldade(const RoletaDificuldade *roleta)
@@ -301,9 +293,9 @@ static void desenharDiscoDificuldade(const RoletaDificuldade *roleta)
 {
     const Vector2 centro = {400, 267};
     const float raio = 174.0f;
-    const float giro = fmodf(roleta->angulo, 360.0f);
-    const bool resultado = roleta->estado == ROLETA_RESULTADO;
-    const float transicao = roleta->tempoAnuncio / DURACAO_ANUNCIO;
+    const float giro = fmodf(roleta->animacao.angulo, 360.0f);
+    const bool resultado = roleta->animacao.estado == ROLETA_RESULTADO;
+    const float transicao = roleta->animacao.tempoAnuncio / DURACAO_ANUNCIO;
     const int total = totalChances(roleta);
 
     DrawCircleV(centro, raio + 8, COR_FUNDO);
@@ -360,9 +352,9 @@ AcaoRoleta desenharRoletaDificuldade(const RoletaDificuldade *roleta)
     DrawText("Uma vez", 652, 230, 16, COR_DOURADO);
     DrawText("por rodada.", 652, 250, 16, COR_DOURADO);
 
-    if (roleta->estado == ROLETA_RESULTADO)
+    if (roleta->animacao.estado == ROLETA_RESULTADO)
     {
-        float progresso = roleta->tempoAnuncio / DURACAO_ANUNCIO;
+        float progresso = roleta->animacao.tempoAnuncio / DURACAO_ANUNCIO;
         float suavizado = progresso * progresso * (3.0f - 2.0f * progresso);
         int deslocamento = (int)((1.0f - suavizado) * 9);
         Dificuldade nova = (Dificuldade)(roleta->base + variacaoDificuldade(roleta));
@@ -372,7 +364,7 @@ AcaoRoleta desenharRoletaDificuldade(const RoletaDificuldade *roleta)
     }
 
     const Rectangle areaAcao = {202, 526, 396, 40};
-    if (roleta->estado == ROLETA_PRONTA)
+    if (roleta->animacao.estado == ROLETA_PRONTA)
     {
         // Antes de girar ainda dá para desistir sem gastar a roleta da rodada.
         if (desenharBotao("VOLTAR", (Rectangle){36, 526, 132, 40}) || IsKeyPressed(KEY_BACKSPACE))
@@ -380,9 +372,9 @@ AcaoRoleta desenharRoletaDificuldade(const RoletaDificuldade *roleta)
         if (desenharBotao("GIRAR ROLETA", areaAcao))
             return ROLETA_GIRAR;
     }
-    else if (roleta->estado == ROLETA_GIRANDO)
+    else if (roleta->animacao.estado == ROLETA_GIRANDO)
         textoCentralizado("SORTEANDO...", 538, 18, COR_CLARO);
-    else if (roleta->tempoAnuncio >= DURACAO_ANUNCIO && desenharBotao("CONTINUAR", areaAcao))
+    else if (roleta->animacao.tempoAnuncio >= DURACAO_ANUNCIO && desenharBotao("CONTINUAR", areaAcao))
         return ROLETA_PROSSEGUIR;
 
     return ROLETA_NENHUMA_ACAO;

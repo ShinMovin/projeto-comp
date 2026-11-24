@@ -18,7 +18,7 @@ static const struct
 
 static bool disponivel(const Jogo *jogo, TipoMinigame tipo)
 {
-    return obterMinigame(tipo) && (!jogo || ajudaDisponivel(jogo, tipo));
+    return minigameDisponivel(tipo) && (!jogo || ajudaDisponivel(jogo, tipo));
 }
 
 int contarAjudasDisponiveis(const Jogo *jogo)
@@ -33,7 +33,7 @@ static void encerrarSessao(Desafios *desafios)
 {
     if (desafios->sessao)
     {
-        obterMinigame(desafios->tipo)->encerrar(desafios->sessao);
+        encerrarMinigame(desafios->tipo, desafios->sessao);
         desafios->sessao = NULL;
     }
 }
@@ -57,8 +57,7 @@ static bool teclaVoltar(void)
 
 static void finalizarDesafio(Desafios *desafios, Jogo *jogo, const Pergunta *pergunta, ResultadoMinigame resultado)
 {
-    const Minigame *minigame = obterMinigame(desafios->tipo);
-    desafios->placar = minigame->placar(desafios->sessao);
+    desafios->placar = placarMinigame(desafios->tipo, desafios->sessao);
     // A faixa do Guitar Hero já terminou. Libera o PCM ao sair do resultado.
     if (desafios->tipo != GUITAR_HERO || resultado == MINIGAME_ABANDONADO)
         encerrarSessao(desafios);
@@ -77,8 +76,9 @@ void atualizarDesafios(Desafios *desafios, Jogo *jogo, const Pergunta *pergunta,
         bool abandonou = teclaVoltar() ||
                         (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
                          CheckCollisionPointRec(GetMousePosition(), areaAbandonar));
-        ResultadoMinigame resultado = abandonou ? MINIGAME_ABANDONADO :
-            obterMinigame(desafios->tipo)->atualizar(desafios->sessao, tempoQuadro);
+        ResultadoMinigame resultado = MINIGAME_ABANDONADO;
+        if (!abandonou)
+            resultado = atualizarMinigame(desafios->tipo, desafios->sessao, tempoQuadro);
         if (resultado != MINIGAME_EM_CURSO)
             finalizarDesafio(desafios, jogo, pergunta, resultado);
     }
@@ -148,8 +148,11 @@ static bool desenharCartoes(Desafios *desafios, const Jogo *jogo)
         }
         else
         {
-            const char *situacao = ativo ? "DISPONÍVEL" :
-                !obterMinigame(tipo) ? "CÓDIGO INDISPONÍVEL" : "JÁ UTILIZADO";
+            const char *situacao = "JÁ UTILIZADO";
+            if (ativo)
+                situacao = "DISPONÍVEL";
+            else if (!minigameDisponivel(tipo))
+                situacao = "CÓDIGO INDISPONÍVEL";
             textoCentradoEm(situacao, centro, 421, 15, letras);
         }
 
@@ -170,9 +173,8 @@ static void iniciarDesafio(Desafios *desafios, Jogo *jogo)
     if (!disponivel(jogo, desafios->tipo))
         return;
 
-    const Minigame *minigame = obterMinigame(desafios->tipo);
     encerrarSessao(desafios);
-    desafios->sessao = minigame->iniciar(!jogo, desafios->opcao);
+    desafios->sessao = iniciarMinigame(desafios->tipo, jogo == NULL, desafios->opcao);
     if (!desafios->sessao)
     {
         desafios->erroAoIniciar = true;
@@ -199,9 +201,11 @@ static void desenharInstrucoes(Desafios *desafios, Jogo *jogo)
     {
         textoCentralizado("Use D, F, J e K quando a nota chegar à linha.", 146, 19, COR_CLARO);
         textoCentralizado("Segure as teclas nas notas com cauda.", 179, 19, COR_CLARO);
-        const char *objetivo = jogo ? "Acerte pelo menos 70% das notas da faixa." :
-            desafios->opcao == 0 ? "Sobreviva 30 segundos com menos de três erros." :
-            "Toque a faixa inteira e acompanhe seus acertos.";
+        const char *objetivo = "Toque a faixa inteira e acompanhe seus acertos.";
+        if (jogo)
+            objetivo = "Acerte pelo menos 70% das notas da faixa.";
+        else if (desafios->opcao == 0)
+            objetivo = "Sobreviva 30 segundos com menos de três erros.";
         textoCentralizado(objetivo, 224, 20, COR_DOURADO);
         if (jogo)
             textoCentralizado("Recompensa: conquiste o valor e avance pela roleta.", 268, 18, COR_CLARO);
@@ -224,10 +228,10 @@ static void desenharInstrucoes(Desafios *desafios, Jogo *jogo)
             textoCentralizado("Recompensa: uma segunda chance nesta pergunta.", 268, 18, COR_CLARO);
     }
 
-    const Minigame *minigame = obterMinigame(desafios->tipo);
-    if (minigame->nomeOpcao)
+    bool treino = jogo == NULL;
+    const char *nome = nomeOpcaoMinigame(desafios->tipo, treino, desafios->opcao);
+    if (nome)
     {
-        const char *nome = minigame->nomeOpcao(!jogo, desafios->opcao);
         textoCentralizado("FAIXA", 326, 15, COR_DOURADO);
         textoCentralizado(nome, 364, 24, COR_CLARO);
         if (desafios->opcao > 0 && desenharBotao("<", (Rectangle){164, 354, 45, 38}))
@@ -235,7 +239,7 @@ static void desenharInstrucoes(Desafios *desafios, Jogo *jogo)
             desafios->opcao--;
             desafios->erroAoIniciar = false;
         }
-        if (minigame->nomeOpcao(!jogo, desafios->opcao + 1) &&
+        if (nomeOpcaoMinigame(desafios->tipo, treino, desafios->opcao + 1) &&
             desenharBotao(">", (Rectangle){591, 354, 45, 38}))
         {
             desafios->opcao++;
@@ -263,8 +267,15 @@ static bool desenharResultadoDesafio(Desafios *desafios, Jogo *jogo)
     const Rectangle painel = {85, 102, 630, 368};
     DrawRectangleRec(painel, COR_AZUL);
     DrawRectangleLinesEx(painel, 2, Fade(cor, entrada));
-    textoCentralizado(venceu ? (jogo ? "AJUDA CONQUISTADA!" : "TREINO CONCLUÍDO!") :
-                      "DESAFIO NÃO CONCLUÍDO", 156 + (int)((1 - entrada) * 18), 32, Fade(cor, entrada));
+    const char *titulo = "DESAFIO NÃO CONCLUÍDO";
+    if (venceu)
+    {
+        if (jogo)
+            titulo = "AJUDA CONQUISTADA!";
+        else
+            titulo = "TREINO CONCLUÍDO!";
+    }
+    textoCentralizado(titulo, 156 + (int)((1 - entrada) * 18), 32, Fade(cor, entrada));
     if (desafios->placar.notas > 0)
         textoCentralizado(TextFormat("%d/%d notas acertadas  |  %.1f%%",
                            desafios->placar.acertos, desafios->placar.notas,
@@ -274,9 +285,11 @@ static bool desenharResultadoDesafio(Desafios *desafios, Jogo *jogo)
 
     if (jogo && venceu)
     {
-        const char *mensagem = desafios->tipo == GUITAR_HERO ? "PULAR E GANHAR: valor da rodada conquistado." :
-            desafios->tipo == TRAVESSIA ? "SEGUNDA CHANCE: você pode errar uma vez." :
-            "Duas alternativas incorretas foram eliminadas.";
+        const char *mensagem = "Duas alternativas incorretas foram eliminadas.";
+        if (desafios->tipo == GUITAR_HERO)
+            mensagem = "PULAR E GANHAR: valor da rodada conquistado.";
+        else if (desafios->tipo == TRAVESSIA)
+            mensagem = "SEGUNDA CHANCE: você pode errar uma vez.";
         textoCentralizado(mensagem, 308, 20, Fade(COR_CLARO, entrada));
     }
     else if (jogo)
@@ -314,7 +327,7 @@ bool desenharDesafios(Desafios *desafios, Jogo *jogo)
         desenharInstrucoes(desafios, jogo);
         break;
     case DESAFIOS_JOGANDO:
-        obterMinigame(desafios->tipo)->desenhar(desafios->sessao);
+        desenharMinigame(desafios->tipo, desafios->sessao);
         desenharBotao("ABANDONAR", areaAbandonar);
         break;
     case DESAFIOS_RESULTADO:

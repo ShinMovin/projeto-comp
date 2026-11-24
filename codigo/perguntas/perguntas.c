@@ -18,12 +18,12 @@
 
 enum { CAPACIDADE_INICIAL = 5 };
 
+// Os ponteiros antigos só são trocados se houver espaço para os dois novos vetores.
 static bool redimensionarBanco(BancoPerguntas *banco, int capacidade)
 {
     if (capacidade < banco->quantidade || (size_t)capacidade > SIZE_MAX / sizeof(Pergunta))
         return false;
 
-    // Troca os dois vetores juntos. Em caso de falha, os originais continuam válidos.
     Pergunta *perguntas = malloc((size_t)capacidade * sizeof *perguntas);
     bool *usadas = calloc((size_t)capacidade, sizeof *usadas);
     if (!perguntas || !usadas)
@@ -70,6 +70,19 @@ void liberaBancoPergunta(BancoPerguntas *banco)
     banco->capacidade = 0;
 }
 
+// Um caractere UTF-8 começa com um byte que indica quantos bytes o seguem.
+// Zero é um byte inicial inválido nesta função, usada só para caracteres não ASCII.
+static int tamanhoCaractereUtf8(unsigned char primeiro)
+{
+    if (primeiro >= 0xC2 && primeiro <= 0xDF)
+        return 2;
+    if (primeiro >= 0xE0 && primeiro <= 0xEF)
+        return 3;
+    if (primeiro >= 0xF0 && primeiro <= 0xF4)
+        return 4;
+    return 0;
+}
+
 static bool textoValido(const char *texto)
 {
     const unsigned char *p = (const unsigned char *)texto;
@@ -80,31 +93,32 @@ static bool textoValido(const char *texto)
     bool temConteudo = false;
     while (p < fim)
     {
-        unsigned char byte = *p++;
+        unsigned char byte = *p;
         if (byte < 0x80)
         {
             if (byte < 32 || byte == 127 || byte == '"')
                 return false;
-            temConteudo |= byte != ' ';
+            if (byte != ' ')
+                temConteudo = true;
+            p++;
             continue;
         }
 
-        // Valida as sequências UTF-8 sem ler além do campo.
-        int restantes = byte >= 0xF0 ? 3 : byte >= 0xE0 ? 2 : 1;
-        if (byte < 0xC2 || byte > 0xF4 || fim - p < restantes)
+        int tamanho = tamanhoCaractereUtf8(byte);
+        if (tamanho == 0 || fim - p < tamanho)
             return false;
-        unsigned int ponto = byte & (0x7Fu >> (restantes + 1));
-        const unsigned int minimo[] = {0, 0x80, 0x800, 0x10000};
-        int extras = restantes;
-        while (extras-- > 0)
+        for (int i = 1; i < tamanho; i++)
         {
-            unsigned char parte = *p++;
-            if ((parte & 0xC0) != 0x80)
+            if (p[i] < 0x80 || p[i] > 0xBF)
                 return false;
-            ponto = (ponto << 6) | (parte & 0x3F);
         }
-        if (ponto < minimo[restantes] || ponto > 0x10FFFF || (ponto >= 0xD800 && ponto <= 0xDFFF))
+        // Estas quatro bordas excluem codificações longas demais e valores reservados ou fora do Unicode.
+        unsigned char segundo = p[1];
+        if ((byte == 0xE0 && segundo < 0xA0) || (byte == 0xED && segundo > 0x9F))
             return false;
+        if ((byte == 0xF0 && segundo < 0x90) || (byte == 0xF4 && segundo > 0x8F))
+            return false;
+        p += tamanho;
         temConteudo = true;
     }
     return temConteudo;
@@ -146,14 +160,12 @@ bool perguntaContem(const Pergunta *pergunta, const char *trecho)
     return strstr(pergunta->conteudo_da_pergunta, trecho) != NULL;
 }
 
-static bool enunciadoJaContado(const BancoPerguntas *banco, int indice, bool apenasUsadas)
+// Um enunciado já usado fica bloqueado mesmo se aparecer em outra categoria ou nível.
+static bool enunciadoJaUsado(const BancoPerguntas *banco, const char *enunciado)
 {
-    const Pergunta *pergunta = &banco->perguntas[indice];
-    int limite = apenasUsadas ? banco->quantidade : indice;
-    for (int i = 0; i < limite; i++)
+    for (int i = 0; i < banco->quantidade; i++)
     {
-        if ((apenasUsadas ? banco->usadas[i] : banco->perguntas[i].dificuldades == pergunta->dificuldades) &&
-            strcmp(banco->perguntas[i].conteudo_da_pergunta, pergunta->conteudo_da_pergunta) == 0)
+        if (banco->usadas[i] && strcmp(banco->perguntas[i].conteudo_da_pergunta, enunciado) == 0)
             return true;
     }
     return false;
@@ -164,7 +176,22 @@ int contaPerguntasDistintas(const BancoPerguntas *banco, Dificuldade dificuldade
     int total = 0;
     for (int i = 0; i < banco->quantidade; i++)
     {
-        if (banco->perguntas[i].dificuldades == dificuldade && !enunciadoJaContado(banco, i, false))
+        const Pergunta *atual = &banco->perguntas[i];
+        if (atual->dificuldades != dificuldade)
+            continue;
+        bool jaContada = false;
+        // Só compara com registros anteriores do nível, para contar cada enunciado uma vez.
+        for (int j = 0; j < i; j++)
+        {
+            const Pergunta *anterior = &banco->perguntas[j];
+            if (anterior->dificuldades == dificuldade &&
+                strcmp(anterior->conteudo_da_pergunta, atual->conteudo_da_pergunta) == 0)
+            {
+                jaContada = true;
+                break;
+            }
+        }
+        if (!jaContada)
             total++;
     }
     return total;
@@ -225,8 +252,10 @@ bool excluirPerguntaPorIndice(BancoPerguntas *banco, int indice)
 static bool perguntaDisponivel(const BancoPerguntas *banco, int indice,
                                Dificuldade dificuldade, Categoria categoria)
 {
-    return !banco->usadas[indice] && banco->perguntas[indice].dificuldades == dificuldade &&
-           banco->perguntas[indice].categorias == categoria && !enunciadoJaContado(banco, indice, true);
+    const Pergunta *pergunta = &banco->perguntas[indice];
+    if (banco->usadas[indice] || pergunta->dificuldades != dificuldade || pergunta->categorias != categoria)
+        return false;
+    return !enunciadoJaUsado(banco, pergunta->conteudo_da_pergunta);
 }
 
 int contaPerguntasDisponiveis(const BancoPerguntas *banco, Dificuldade dificuldade, Categoria categoria)
@@ -408,7 +437,7 @@ int carregaBinario(BancoPerguntas *banco, const char *nome_arq)
     FILE *arq = fopen(nome_arq, "rb");
     if (!arq)
         return 0;
-    BancoPerguntas novo;
+    BancoPerguntas novo; // Só substitui o banco do chamador se todo o DAT for válido.
     bool ok = inicializaBanco(&novo);
     int quantidade = -1;
     if (ok)

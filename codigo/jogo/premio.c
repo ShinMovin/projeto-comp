@@ -25,7 +25,19 @@ Dificuldade dificuldadeRodada(int rodada)
 
 int valorRodada(int rodada)
 {
-    return rodada >= 0 && rodada < TOTAL_RODADAS ? valoresRodadas[rodada] : 0;
+    if (rodada < 0 || rodada >= TOTAL_RODADAS)
+        return 0;
+    return valoresRodadas[rodada];
+}
+
+int premioComBonus(int rodada, int bonusAcumulado)
+{
+    int base = valorRodada(rodada);
+    int teto = valorRodada(TOTAL_RODADAS - 1);
+    int espacoParaBonus = teto - base;
+    if (bonusAcumulado >= espacoParaBonus)
+        return teto;
+    return base + bonusAcumulado;
 }
 
 void chancesDificuldade(int rodada, int chances[QUANTIDADE_OPCOES_DIF])

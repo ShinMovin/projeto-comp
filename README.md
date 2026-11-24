@@ -1,5 +1,7 @@
 # projeto-comp
 
+O [Guia do código](GUIA_DO_CODIGO.md) apresenta a estrutura do projeto e a ordem de estudo para a apresentação.
+
 ## Compilar e executar
 
 Execute os comandos a partir da raiz do repositório. O Makefile detecta Windows ou Linux e grava o binário em `compilado/`. O jogo lê o banco em `dados/` a partir do diretório do executável, então mantenha essas pastas lado a lado.
@@ -29,7 +31,11 @@ Para abrir o gerenciamento pelo terminal, execute `./compilado/jogo --banco`.
 ### Recursos e banco de perguntas
 
 - O jogo carrega `dados/perguntas.dat` e usa `dados/perguntas.csv` como alternativa. O DAT legado depende do formato binário de `int`, `enum` e `Pergunta` utilizado pelo compilador. O CSV utiliza UTF-8 e aceita quebras LF ou CRLF.
-- Os alvos opcionais `guitarhero` e `tiroalvo` compilam os minigames existentes e copiam os áudios para `compilado/guitarhero-musicas/` e `compilado/audio-tiroalvo/`. Mantenha esses nomes e a caixa dos nomes dos arquivos. No Linux, por exemplo, execute `make -C codigo guitarhero tiroalvo` a partir da raiz.
+- Os alvos opcionais `guitarhero`, `tiroalvo` e `travessia` compilam os minigames independentes. O Makefile copia os áudios para `compilado/guitarhero-musicas/` e `compilado/audio-tiroalvo/`. No Linux, execute `make -C codigo guitarhero tiroalvo travessia` a partir da raiz.
+
+## Partida
+
+A partida tem 15 perguntas. A dificuldade base aumenta a cada três rodadas. Antes de sortear a categoria, o jogador pode girar uma roleta opcional para mudar a dificuldade. Acertar após um aumento dá bônus. O prêmio total, incluindo os bônus, é limitado a R$ 1 milhão. Os checkpoints das rodadas 3, 6, 9 e 12 protegem o prêmio atual daquele momento.
 
 ## Ajudas e treino
 
@@ -37,7 +43,7 @@ Use **PEDIR AJUDA** na pergunta ou **TESTAR MINIGAMES** no menu principal. Ambos
 
 - **Guitar Hero** usa D, F, J e K. No modo de ajuda, acertar pelo menos 70% das notas da faixa concede o valor da rodada e libera o avanço pela roleta. A ajuda fica indisponível na pergunta do milhão.
 - **Tiro ao Alvo** exige 7.500 pontos em 30 segundos. A vitória elimina duas alternativas incorretas sorteadas.
-- **Crossy Road** aparece como indisponível enquanto os arquivos-fonte estiverem vazios.
+- **Travessia** usa as setas ou WASD. Avance 25 pistas com três vidas para ganhar uma segunda chance na pergunta atual. O treino continua até acabarem as vidas.
 
 Cada tentativa de ajuda é consumida ao iniciar o desafio, inclusive se ele for abandonado. O Makefile copia as faixas e efeitos dos minigames ao compilar o jogo principal. Os alvos independentes continuam disponíveis para treino isolado.
 
@@ -45,9 +51,9 @@ Cada tentativa de ajuda é consumida ao iniciar o desafio, inclusive se ele for 
 
 Abra **BANCO DE PERGUNTAS** no menu principal para pesquisar, adicionar, editar ou excluir registros. Use **TAB** e **Shift+TAB** para mudar de campo, **Backspace** para apagar e **SALVAR BANCO** para gravar. A opção `--banco` oferece as mesmas operações pelo terminal, além da exportação para `dados/perguntas_exportadas.csv`.
 
-O jogo usa o DAT válido como base e compara todo o conteúdo do CSV antes de salvar. Registros exclusivos de qualquer arquivo são preservados. Para editar ou excluir uma pergunta dos dois formatos, use o editor ou `--banco`. Se um arquivo existente estiver inválido ou ilegível, o banco disponível é aberto para consulta até que o arquivo com problema seja corrigido.
+O jogo usa um DAT válido como fonte principal. Quando ainda não existe DAT, tenta gerar um a partir do CSV. Se existir um DAT inválido e o CSV puder ser lido, o banco abre para consulta.
 
-A gravação gera os dois arquivos a partir da mesma versão e conserva cópias de segurança até a confirmação do par. Após uma interrupção durante a troca, a próxima abertura recupera a versão anterior. Durante uma partida ou sessão do editor, outra instância pode abrir o banco assim que a sessão em uso terminar.
+O editor e o modo `--banco` salvam as alterações no DAT. O jogo grava e confere um arquivo temporário antes de substituir o DAT ativo. O CSV original fica disponível para importação e o modo terminal pode gerar `dados/perguntas_exportadas.csv`. A trava do banco permanece ativa até o fim da sessão que está usando seus dados.
 
 Cada campo de texto aceita até 200 bytes em UTF-8. O editor avisa se algum nível ficar com menos de três enunciados distintos, necessários para as 15 rodadas.
 

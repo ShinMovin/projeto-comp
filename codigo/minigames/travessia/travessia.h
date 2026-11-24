@@ -8,6 +8,12 @@
 
 #include "../minigame.h"
 
-extern const Minigame travessia;
+/* A sessão é criada no início, passada a cada quadro e liberada ao encerrar. */
+typedef struct SessaoTravessia SessaoTravessia;
+SessaoTravessia *IniciarTravessia(bool treino, int opcao);
+ResultadoMinigame AtualizarTravessia(SessaoTravessia *sessao, float segundos);
+void DesenharTravessia(const SessaoTravessia *sessao);
+PlacarMinigame PlacarTravessia(const SessaoTravessia *sessao);
+void EncerrarTravessia(SessaoTravessia *sessao);
 
 #endif

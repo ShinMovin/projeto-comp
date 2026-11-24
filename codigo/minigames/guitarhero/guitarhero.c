@@ -422,8 +422,9 @@ static void DesenharResultado(const Partida *partida)
 
 #endif
 
-typedef struct
+struct SessaoGuitarra
 {
+    // A partida guarda as notas e o placar. A sessão também possui o áudio e seu relógio.
     Partida partida;
     Sound somFaixa;
     float tempo;
@@ -431,9 +432,9 @@ typedef struct
     bool tocandoFaixa;
     bool treino;
     ResultadoMinigame resultado;
-} SessaoGuitarra;
+};
 
-static const char *NomeOpcaoGuitarra(bool treino, int opcao)
+const char *NomeOpcaoGuitarra(bool treino, int opcao)
 {
     if (treino && opcao == 0)
         return "Treino livre";
@@ -441,7 +442,7 @@ static const char *NomeOpcaoGuitarra(bool treino, int opcao)
     return faixa >= 0 && (size_t)faixa < TAMANHO_VETOR(faixas) ? faixas[faixa].nome : NULL;
 }
 
-static void *IniciarGuitarra(bool treino, int opcao)
+SessaoGuitarra *IniciarGuitarra(bool treino, int opcao)
 {
     if (!NomeOpcaoGuitarra(treino, opcao))
         return NULL;
@@ -492,12 +493,12 @@ static ResultadoMinigame ConcluirGuitarra(SessaoGuitarra *sessao)
     return sessao->resultado;
 }
 
-static ResultadoMinigame AtualizarGuitarra(void *dados, float tempoQuadro)
+ResultadoMinigame AtualizarGuitarra(SessaoGuitarra *sessao, float tempoQuadro)
 {
-    SessaoGuitarra *sessao = dados;
     Partida *partida = &sessao->partida;
     if (sessao->resultado != MINIGAME_EM_CURSO)
         return sessao->resultado;
+    // O atraso de saída é contado em quadros para a janela continuar respondendo.
     if (sessao->esperaSaidaAudio > 0.0f)
     {
         sessao->esperaSaidaAudio -= tempoQuadro;
@@ -537,9 +538,8 @@ static ResultadoMinigame AtualizarGuitarra(void *dados, float tempoQuadro)
     return sessao->resultado;
 }
 
-static void DesenharGuitarra(const void *dados)
+void DesenharGuitarra(const SessaoGuitarra *sessao)
 {
-    const SessaoGuitarra *sessao = dados;
     ClearBackground(BLACK);
     DesenharPartida(&sessao->partida, sessao->tempo, sessao->esperaSaidaAudio > 0.0f);
     if (!sessao->treino)
@@ -547,16 +547,14 @@ static void DesenharGuitarra(const void *dados)
                             sessao->partida.quantidadeNotas), 16, 129, 17, GOLD);
 }
 
-static PlacarMinigame PlacarGuitarra(const void *dados)
+PlacarMinigame PlacarGuitarra(const SessaoGuitarra *sessao)
 {
-    const SessaoGuitarra *sessao = dados;
     return (PlacarMinigame){.pontos = sessao->partida.pontos, .acertos = TotalAcertos(&sessao->partida),
                            .notas = sessao->partida.quantidadeNotas};
 }
 
-static void EncerrarGuitarra(void *dados)
+void EncerrarGuitarra(SessaoGuitarra *sessao)
 {
-    SessaoGuitarra *sessao = dados;
     if (IsSoundValid(sessao->somFaixa))
     {
         if (IsSoundPlaying(sessao->somFaixa))
@@ -565,15 +563,6 @@ static void EncerrarGuitarra(void *dados)
     }
     free(sessao);
 }
-
-const Minigame guitarHero = {
-    .nomeOpcao = NomeOpcaoGuitarra,
-    .iniciar = IniciarGuitarra,
-    .atualizar = AtualizarGuitarra,
-    .desenhar = DesenharGuitarra,
-    .placar = PlacarGuitarra,
-    .encerrar = EncerrarGuitarra
-};
 
 #ifdef GUITARHERO_INDEPENDENTE
 int main(void)
@@ -588,7 +577,7 @@ int main(void)
 
     while (!WindowShouldClose())
     {
-        if (tela == TELA_JOGO && guitarHero.atualizar(sessao, GetFrameTime()) != MINIGAME_EM_CURSO)
+        if (tela == TELA_JOGO && AtualizarGuitarra(sessao, GetFrameTime()) != MINIGAME_EM_CURSO)
             tela = TELA_RESULTADO;
 
         int iniciarOpcao = -1;
@@ -627,14 +616,14 @@ int main(void)
             break;
 
         case TELA_JOGO:
-            guitarHero.desenhar(sessao);
+            DesenharGuitarra(sessao);
             break;
 
         case TELA_RESULTADO:
             DesenharResultado(&sessao->partida);
             if (Botao((Rectangle){280, 438, 240, 52}, "Voltar ao menu"))
             {
-                guitarHero.encerrar(sessao);
+                EncerrarGuitarra(sessao);
                 sessao = NULL;
                 tela = TELA_MENU;
             }
@@ -644,7 +633,7 @@ int main(void)
 
         if (iniciarOpcao >= 0)
         {
-            sessao = guitarHero.iniciar(true, iniciarOpcao);
+            sessao = IniciarGuitarra(true, iniciarOpcao);
             if (sessao)
                 tela = TELA_JOGO;
             else
@@ -655,7 +644,7 @@ int main(void)
     }
 
     if (sessao)
-        guitarHero.encerrar(sessao);
+        EncerrarGuitarra(sessao);
     if (IsAudioDeviceReady())
         CloseAudioDevice();
     CloseWindow();

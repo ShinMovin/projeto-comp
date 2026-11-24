@@ -1,10 +1,7 @@
 /**
  * @file travessia.c
  * @author VGA
- * @brief Minigame Travessia: avance pistas de grama e rua sem ser atropelado.
- *
- * ESBOÇO: já dá para jogar com grama, árvores e ruas com carros.
- * Ideias para continuar estão marcadas com TODO.
+ * @brief Minigame Travessia: avance pelas pistas, ruas, rios e trilhos.
  */
 #include "travessia.h"
 #include "desenho.h"
@@ -57,7 +54,7 @@ typedef struct
     bool tremPassando;         // só no trilho: o trem está atravessando a tela
 } Pista;
 
-typedef struct
+struct SessaoTravessia
 {
     Pista pistas[BUFFER_PISTAS];
     int coluna, linha;                  // posição do jogador na grade (a linha cresce para cima)
@@ -72,7 +69,7 @@ typedef struct
     float contagem;                     // "3, 2, 1" antes de começar
     bool infinito;                      // treino: sem chegada, vai até acabarem as vidas
     ResultadoMinigame resultado;
-} SessaoTravessia;
+};
 
 /* ---------- Mapa ---------- */
 
@@ -330,7 +327,7 @@ static bool levarPeloRio(SessaoTravessia *sessao, float dt)
     return true;
 }
 
-static void *IniciarTravessia(bool treino, int opcao)
+SessaoTravessia *IniciarTravessia(bool treino, int opcao)
 {
     if (opcao != 0)
         return NULL;
@@ -348,9 +345,8 @@ static void *IniciarTravessia(bool treino, int opcao)
     return sessao;
 }
 
-static ResultadoMinigame AtualizarTravessia(void *dados, float dt)
+ResultadoMinigame AtualizarTravessia(SessaoTravessia *sessao, float dt)
 {
-    SessaoTravessia *sessao = dados;
     if (sessao->resultado != MINIGAME_EM_CURSO)
         return sessao->resultado;
     moverCarros(sessao, dt);
@@ -525,9 +521,8 @@ static void desenharJogador(const SessaoTravessia *sessao)
     DrawCircle((int)x + 23, (int)y + 12, 2, BLACK);
 }
 
-static void DesenharTravessia(const void *dados)
+void DesenharTravessia(const SessaoTravessia *sessao)
 {
-    const SessaoTravessia *sessao = dados;
     ClearBackground(BLACK);
     int primeira = (int)sessao->camera;
     for (int linha = primeira; linha <= primeira + LINHAS_VISIVEIS + 1; linha++)
@@ -552,25 +547,15 @@ static void DesenharTravessia(const void *dados)
     }
 }
 
-static PlacarMinigame PlacarTravessia(const void *dados)
+PlacarMinigame PlacarTravessia(const SessaoTravessia *sessao)
 {
-    const SessaoTravessia *sessao = dados;
     return (PlacarMinigame){.pontos = sessao->maiorLinha};
 }
 
-static void EncerrarTravessia(void *dados)
+void EncerrarTravessia(SessaoTravessia *sessao)
 {
-    free(dados);
+    free(sessao);
 }
-
-const Minigame travessia = {
-    .nomeOpcao = NULL, // uma única fase, sem escolha de faixa
-    .iniciar = IniciarTravessia,
-    .atualizar = AtualizarTravessia,
-    .desenhar = DesenharTravessia,
-    .placar = PlacarTravessia,
-    .encerrar = EncerrarTravessia
-};
 
 #ifdef TRAVESSIA_INDEPENDENTE
 // Permite testar só o minigame: make -C codigo run-travessia
@@ -578,19 +563,19 @@ int main(void)
 {
     InitWindow(LARGURA, ALTURA, "Travessia");
     SetTargetFPS(60);
-    void *sessao = travessia.iniciar(true, 0);
+    SessaoTravessia *sessao = IniciarTravessia(true, 0);
     while (sessao && !WindowShouldClose())
     {
-        ResultadoMinigame resultado = travessia.atualizar(sessao, GetFrameTime());
+        ResultadoMinigame resultado = AtualizarTravessia(sessao, GetFrameTime());
         if (resultado != MINIGAME_EM_CURSO && IsKeyPressed(KEY_R))
         {
-            travessia.encerrar(sessao);
-            sessao = travessia.iniciar(true, 0);
+            EncerrarTravessia(sessao);
+            sessao = IniciarTravessia(true, 0);
             continue;
         }
 
         BeginDrawing();
-        travessia.desenhar(sessao);
+        DesenharTravessia(sessao);
         if (resultado != MINIGAME_EM_CURSO)
         {
             DrawRectangle(0, 0, LARGURA, ALTURA, Fade(BLACK, 0.6f));
@@ -602,7 +587,7 @@ int main(void)
         EndDrawing();
     }
     if (sessao)
-        travessia.encerrar(sessao);
+        EncerrarTravessia(sessao);
     CloseWindow();
     return 0;
 }

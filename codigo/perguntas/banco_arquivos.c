@@ -18,14 +18,9 @@
 #include <unistd.h>
 #endif
 
-static const char *const nomes[] = {"perguntas.csv", "perguntas.dat"};
-static const char *const novos[] = {".banco-csv.novo", ".banco-dat.novo"};
-static const char *const anteriores[] = {".banco-csv.anterior", ".banco-dat.anterior"};
-// Índice do .dat nos vetores acima. Só ele é gravado; o CSV original nunca é alterado.
-enum { ARQ_DAT = 1 };
-static const char marca[] = ".banco-pendente";
-static const char marcaNova[] = ".banco-pendente.novo";
-static const char restauracao[] = ".banco-restauracao";
+static const char nomeCsv[] = "perguntas.csv";
+static const char nomeDat[] = "perguntas.dat";
+static const char nomeTemporario[] = ".banco-dat.novo";
 
 static void caminho(char destino[CAMINHO_BANCO_MAXIMO], const ArquivosBanco *arquivos, const char *nome)
 {
@@ -52,11 +47,12 @@ void configurarTerminalUtf8(void)
 #endif
 }
 
+// O sistema libera a trava ao fechar o descritor, inclusive ao encerrar o processo.
 static bool tentarBloquear(ArquivosBanco *arquivos)
 {
     char local[CAMINHO_BANCO_MAXIMO];
     caminho(local, arquivos, ".banco-lock");
-    // A trava fica em um arquivo separado, pois CSV e DAT são substituídos.
+    // O arquivo da trava é separado porque a gravação troca o arquivo DAT.
 #ifdef _WIN32
     HANDLE handle = CreateFileA(local, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                 NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -107,6 +103,7 @@ static int estadoArquivo(const char *caminhoArquivo)
     return errno == ENOENT ? 0 : -1;
 }
 
+// Troca o destino em uma única operação. Os dois caminhos ficam na mesma pasta.
 static bool substituirArquivo(const char *origem, const char *destino)
 {
 #ifdef _WIN32
@@ -121,6 +118,7 @@ static bool removerArquivo(const char *local)
     return remove(local) == 0 || errno == ENOENT;
 }
 
+// fflush envia a escrita de C ao sistema. A segunda chamada pede a gravação no dispositivo.
 static bool sincronizar(FILE *arquivo)
 {
     if (fflush(arquivo) != 0)
@@ -164,9 +162,11 @@ static bool copiarArquivo(const char *origem, const char *destino)
     return ok;
 }
 
-static void limparTemporarios(const ArquivosBanco *arquivos)
+// Só a recuperação de versões antigas usa marcador e arquivos de backup.
+static void limparTemporariosAntigos(const ArquivosBanco *arquivos)
 {
-    const char *const temporarios[] = {novos[0], novos[1], anteriores[0], anteriores[1], marcaNova, restauracao};
+    const char *const temporarios[] = {".banco-csv.novo", nomeTemporario, ".banco-csv.anterior",
+        ".banco-dat.anterior", ".banco-pendente.novo", ".banco-restauracao"};
     char local[CAMINHO_BANCO_MAXIMO];
     for (size_t i = 0; i < sizeof temporarios / sizeof temporarios[0]; i++)
     {
@@ -175,10 +175,12 @@ static void limparTemporarios(const ArquivosBanco *arquivos)
     }
 }
 
-static bool recuperarGravacao(const ArquivosBanco *arquivos)
+// Em instalações antigas, dois bytes diziam se o CSV e o DAT já existiam.
+// Só recuperamos o DAT. O CSV original permanece como fonte inicial.
+static bool recuperarGravacaoAntiga(const ArquivosBanco *arquivos)
 {
     char pendente[CAMINHO_BANCO_MAXIMO];
-    caminho(pendente, arquivos, marca);
+    caminho(pendente, arquivos, ".banco-pendente");
     int estado = estadoArquivo(pendente);
     if (estado == 0)
         return true;
@@ -188,72 +190,66 @@ static bool recuperarGravacao(const ArquivosBanco *arquivos)
     FILE *arquivo = fopen(pendente, "rb");
     if (!arquivo)
         return false;
-    int existiam[2] = {fgetc(arquivo), fgetc(arquivo)};
+    int existiaCsv = fgetc(arquivo);
+    int existiaDat = fgetc(arquivo);
     bool valido = fgetc(arquivo) == EOF && !ferror(arquivo);
     if (fclose(arquivo) != 0 || !valido ||
-        (existiam[0] != '0' && existiam[0] != '1') || (existiam[1] != '0' && existiam[1] != '1'))
+        (existiaCsv != '0' && existiaCsv != '1') || (existiaDat != '0' && existiaDat != '1'))
         return false;
 
-    // Mantém o backup até restaurar o destino. Assim, a recuperação pode ser repetida.
-    for (int i = ARQ_DAT; i < 2; i++)
+    char destino[CAMINHO_BANCO_MAXIMO];
+    caminho(destino, arquivos, nomeDat);
+    if (existiaDat == '1')
     {
-        char destino[CAMINHO_BANCO_MAXIMO], backup[CAMINHO_BANCO_MAXIMO], temp[CAMINHO_BANCO_MAXIMO];
-        caminho(destino, arquivos, nomes[i]);
-        caminho(backup, arquivos, anteriores[i]);
-        caminho(temp, arquivos, restauracao);
-        if (existiam[i] == '1')
-        {
-            if (!copiarArquivo(backup, temp) || !substituirArquivo(temp, destino))
-                return false;
-        }
-        else if (!removerArquivo(destino))
+        // Só apaga o backup ao terminar. Uma interrupção aqui permite nova tentativa.
+        char backup[CAMINHO_BANCO_MAXIMO], temp[CAMINHO_BANCO_MAXIMO];
+        caminho(backup, arquivos, ".banco-dat.anterior");
+        caminho(temp, arquivos, ".banco-restauracao");
+        if (!copiarArquivo(backup, temp) || !substituirArquivo(temp, destino))
             return false;
     }
+    else if (!removerArquivo(destino))
+        return false;
     if (!removerArquivo(pendente))
         return false;
-    limparTemporarios(arquivos);
+    limparTemporariosAntigos(arquivos);
     return true;
 }
 
 const char *recarregarBancoArquivos(ArquivosBanco *arquivos, BancoPerguntas *banco)
 {
-    if (!arquivos->bloqueado || !recuperarGravacao(arquivos))
+    if (!arquivos->bloqueado || !recuperarGravacaoAntiga(arquivos))
         return "Não foi possível recuperar os arquivos do banco.";
 
     char localCsv[CAMINHO_BANCO_MAXIMO], localDat[CAMINHO_BANCO_MAXIMO];
-    caminho(localCsv, arquivos, nomes[0]);
-    caminho(localDat, arquivos, nomes[1]);
+    caminho(localCsv, arquivos, nomeCsv);
+    caminho(localDat, arquivos, nomeDat);
     int existeCsv = estadoArquivo(localCsv);
     int existeDat = estadoArquivo(localDat);
-    BancoPerguntas csv = {0}, dat = {0};
-    // O .dat é o banco de verdade. O CSV é só a fonte inicial, lida quando ainda não há .dat.
-    bool leuDat = existeDat == 1 && carregaBinario(&dat, localDat);
-    bool leuCsv = !leuDat && existeCsv == 1 && carregaPerguntas(&csv, localCsv);
-
-    arquivos->somenteDat = 0;
-    arquivos->somenteCsv = 0;
-    // Um .dat corrompido não é sobrescrito: o banco abre só para consulta.
-    arquivos->somenteLeitura = existeDat != 0 && !leuDat;
-    const char *erro = NULL;
-    if (!leuDat && !leuCsv && (existeDat != 0 || existeCsv != 0))
-        erro = "O CSV e o DAT estão indisponíveis ou inválidos.";
-    else if (!leuDat && !leuCsv && !inicializaBanco(&dat))
-        erro = "Memória insuficiente para abrir o banco.";
-
-    if (!erro)
+    // Cada carregador só troca o banco em memória quando termina a leitura com sucesso.
+    if (existeDat == 1 && carregaBinario(banco, localDat))
     {
-        BancoPerguntas *origem = leuDat || !leuCsv ? &dat : &csv;
-        liberaBancoPergunta(banco);
-        *banco = *origem;
-        *origem = (BancoPerguntas){0};
+        arquivos->somenteLeitura = false;
+        return NULL;
     }
-    liberaBancoPergunta(&csv);
-    liberaBancoPergunta(&dat);
+    // Se o DAT existe mas falhou, o CSV é uma alternativa só para consulta.
+    arquivos->somenteLeitura = existeDat != 0;
+    if (existeCsv == 1 && carregaPerguntas(banco, localCsv))
+    {
+        // Quando ainda não há DAT, tenta criá-lo. Em caso de falha, usa o que está em memória.
+        if (existeDat == 0)
+            salvarBancoArquivos(arquivos, banco);
+        return NULL;
+    }
+    if (existeDat != 0 || existeCsv != 0)
+        return "O CSV e o DAT estão indisponíveis ou inválidos.";
 
-    // Primeira execução: cria o .dat a partir do CSV. Se falhar, o jogo segue com o banco em memória.
-    if (!erro && leuCsv && existeDat == 0)
-        salvarBancoArquivos(arquivos, banco);
-    return erro;
+    BancoPerguntas vazio;
+    if (!inicializaBanco(&vazio))
+        return "Memória insuficiente para abrir o banco.";
+    liberaBancoPergunta(banco);
+    *banco = vazio;
+    return NULL;
 }
 
 const char *abrirBancoArquivos(ArquivosBanco *arquivos, BancoPerguntas *banco)
@@ -266,10 +262,11 @@ const char *abrirBancoArquivos(ArquivosBanco *arquivos, BancoPerguntas *banco)
     return erro;
 }
 
-static bool conferirCopia(const BancoPerguntas *banco, const char *local, int formato)
+// Reabre o temporário pelo leitor do jogo e verifica os campos de cada pergunta.
+static bool conferirCopia(const BancoPerguntas *banco, const char *local)
 {
     BancoPerguntas copia = {0};
-    bool ok = formato == 0 ? carregaPerguntas(&copia, local) : carregaBinario(&copia, local);
+    bool ok = carregaBinario(&copia, local);
     ok = ok && copia.quantidade == banco->quantidade;
     for (int i = 0; ok && i < banco->quantidade; i++)
         ok = perguntasIguais(&banco->perguntas[i], &copia.perguntas[i]);
@@ -279,48 +276,21 @@ static bool conferirCopia(const BancoPerguntas *banco, const char *local, int fo
 
 const char *salvarBancoArquivos(ArquivosBanco *arquivos, const BancoPerguntas *banco)
 {
-    if (!arquivos->bloqueado || !recuperarGravacao(arquivos))
+    if (!arquivos->bloqueado || !recuperarGravacaoAntiga(arquivos))
         return "Não foi possível recuperar os arquivos antes de salvar.";
     if (arquivos->somenteLeitura)
         return "Há um arquivo inválido ou ilegível. Os originais foram preservados.";
 
-    char originais[2][CAMINHO_BANCO_MAXIMO], temp[2][CAMINHO_BANCO_MAXIMO];
-    char pendente[CAMINHO_BANCO_MAXIMO], pendenteNovo[CAMINHO_BANCO_MAXIMO];
-    char existiam[2] = {'1', '1'}; // a posição do CSV é ignorada na recuperação
-    caminho(pendente, arquivos, marca);
-    caminho(pendenteNovo, arquivos, marcaNova);
-    for (int i = ARQ_DAT; i < 2; i++)
-    {
-        char backup[CAMINHO_BANCO_MAXIMO];
-        caminho(originais[i], arquivos, nomes[i]);
-        caminho(temp[i], arquivos, novos[i]);
-        caminho(backup, arquivos, anteriores[i]);
-        int estado = estadoArquivo(originais[i]);
-        existiam[i] = estado == 1 ? '1' : '0';
+    char destino[CAMINHO_BANCO_MAXIMO], temp[CAMINHO_BANCO_MAXIMO];
+    caminho(destino, arquivos, nomeDat);
+    caminho(temp, arquivos, nomeTemporario);
+    if (estadoArquivo(destino) < 0)
+        return "Não foi possível acessar o destino do banco.";
 
-        if (estado < 0 || (estado == 1 && !copiarArquivo(originais[i], backup)))
-            return "Não foi possível preparar a cópia de segurança do banco.";
-        bool gravou = i == 0 ? salvaPergunta(banco, temp[i]) : salvaBinario(banco, temp[i]);
-        if (!gravou || !sincronizarArquivo(temp[i]) || !conferirCopia(banco, temp[i], i))
-            return "Falha ao gravar ou conferir os arquivos temporários.";
-    }
-
-    // O marcador nasce antes da primeira troca e só desaparece ao confirmar o par.
-    FILE *marcador = fopen(pendenteNovo, "wb");
-    if (!marcador)
-        return "Não foi possível preparar a confirmação do salvamento.";
-    bool registrou = fwrite(existiam, 1, sizeof existiam, marcador) == sizeof existiam && sincronizar(marcador);
-    if (fclose(marcador) != 0 || !registrou || !substituirArquivo(pendenteNovo, pendente))
-        return "Não foi possível preparar a confirmação do salvamento.";
-
-    if (!substituirArquivo(temp[ARQ_DAT], originais[ARQ_DAT]) || !removerArquivo(pendente))
-    {
-        if (!recuperarGravacao(arquivos))
-            return "Falha no salvamento. A recuperação será tentada na próxima abertura.";
-        return "Falha no salvamento. A versão anterior foi restaurada.";
-    }
-    limparTemporarios(arquivos);
-    arquivos->somenteCsv = 0;
-    arquivos->somenteDat = 0;
+    // O DAT em uso só muda depois de escrever, sincronizar e conferir o novo arquivo.
+    if (!salvaBinario(banco, temp) || !sincronizarArquivo(temp) || !conferirCopia(banco, temp))
+        return "Falha ao gravar ou conferir o DAT temporário.";
+    if (!substituirArquivo(temp, destino))
+        return "Falha ao substituir o DAT. O banco anterior foi preservado.";
     return NULL;
 }

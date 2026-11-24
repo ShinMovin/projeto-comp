@@ -38,6 +38,7 @@ endif
 
 # Caminhos em relação a codigo/, também usados pelos alvos independentes.
 INCLUDES_PROJETO = -I. -Iinterface -Iperguntas -Ijogo
+OPCOES_C = $(CPPFLAGS) $(INCLUDES_PROJETO) $(RAYLIB_CFLAGS) $(CFLAGS)
 DESENHO = interface/desenho.c
 FONTES = main.c $(DESENHO) \
     interface/interface.c interface/interface_ajudas.c interface/interface_banco.c \
@@ -78,7 +79,7 @@ endif
 
 $(JOGO): $(FONTES) $(CABECALHOS) Makefile $(RAYLIB_ARQUIVO) | $(GUITARHERO_AUDIO) $(TIROALVO_AUDIO)
 	mkdir -p "$(PASTA)"
-	$(CC) $(CPPFLAGS) $(INCLUDES_PROJETO) $(RAYLIB_CFLAGS) $(CFLAGS) $(FONTES) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
+	$(CC) $(OPCOES_C) $(FONTES) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
 
 run: $(JOGO)
 	$(JOGO)
@@ -87,7 +88,7 @@ guitarhero: $(GUITARHERO)
 
 $(GUITARHERO): $(GUITARHERO_FONTES) $(DESENHO) $(CABECALHOS) Makefile $(RAYLIB_ARQUIVO) | $(GUITARHERO_AUDIO)
 	mkdir -p "$(PASTA)"
-	$(CC) -std=c99 -DGUITARHERO_INDEPENDENTE $(CPPFLAGS) $(INCLUDES_PROJETO) $(RAYLIB_CFLAGS) $(CFLAGS) $(GUITARHERO_FONTES) $(DESENHO) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
+	$(CC) -std=c99 -DGUITARHERO_INDEPENDENTE $(OPCOES_C) $(GUITARHERO_FONTES) $(DESENHO) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
 
 $(PASTA)/guitarhero-musicas/%: minigames/guitarhero/guitarhero-musicas/%
 	mkdir -p "$(@D)"
@@ -100,7 +101,7 @@ tiroalvo: $(TIROALVO)
 
 $(TIROALVO): $(TIROALVO_FONTES) $(DESENHO) $(CABECALHOS) Makefile $(RAYLIB_ARQUIVO) | $(TIROALVO_AUDIO)
 	mkdir -p "$(PASTA)"
-	$(CC) -std=c99 -DTIROALVO_INDEPENDENTE $(CPPFLAGS) $(INCLUDES_PROJETO) $(RAYLIB_CFLAGS) $(CFLAGS) $(TIROALVO_FONTES) $(DESENHO) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
+	$(CC) -std=c99 -DTIROALVO_INDEPENDENTE $(OPCOES_C) $(TIROALVO_FONTES) $(DESENHO) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
 
 $(PASTA)/audio-tiroalvo/%: minigames/tiroalvo/audio/%
 	mkdir -p "$(@D)"
@@ -113,7 +114,7 @@ travessia: $(TRAVESSIA)
 
 $(TRAVESSIA): $(TRAVESSIA_FONTES) $(DESENHO) $(CABECALHOS) Makefile $(RAYLIB_ARQUIVO)
 	mkdir -p "$(PASTA)"
-	$(CC) -std=c99 -DTRAVESSIA_INDEPENDENTE $(CPPFLAGS) $(INCLUDES_PROJETO) $(RAYLIB_CFLAGS) $(CFLAGS) $(TRAVESSIA_FONTES) $(DESENHO) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
+	$(CC) -std=c99 -DTRAVESSIA_INDEPENDENTE $(OPCOES_C) $(TRAVESSIA_FONTES) $(DESENHO) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
 
 run-travessia: $(TRAVESSIA)
 	$(TRAVESSIA)

@@ -18,6 +18,8 @@ typedef enum
     SORTEA, NOVO_NIVEL, PERGUNTA, CONFIRMANDO, SUSPENSE, ACERTOU, ERROU, VITORIA, DERROTA
 } Estado;
 
+// Uma instância representa a partida inteira. A rodada vale 0 a 14 internamente.
+// Os índices e as letras apontam para a pergunta no banco e suas quatro alternativas.
 typedef struct
 {
     Estado estado;
@@ -48,13 +50,17 @@ void iniciarJogo(Jogo *jogo, BancoPerguntas *banco);
 bool selecionarPergunta(Jogo *jogo, BancoPerguntas *banco, Categoria categoria);
 
 void escolherResposta(Jogo *jogo, char alternativa);
+/** @brief Diz se a letra saiu do jogo por eliminação ou por uma segunda chance já usada. */
 bool alternativaBloqueada(const Jogo *jogo, char alternativa);
 void cancelarResposta(Jogo *jogo);
 void confirmarResposta(Jogo *jogo);
+/** @brief Usa o tempo do quadro em segundos para revelar respostas e animar transições. */
 void atualizarJogo(Jogo *jogo, const BancoPerguntas *banco, float tempoQuadro);
+/** @brief Avança após um acerto, reinicia os dados da rodada e retorna se houve avanço. */
 bool avancarRodada(Jogo *jogo);
 bool ajudaDisponivel(const Jogo *jogo, TipoMinigame tipo);
 bool iniciarAjuda(Jogo *jogo, TipoMinigame tipo);
+/** @brief Reage ao fim do desafio e retorna se sua recompensa foi aplicada à pergunta. */
 bool concluirAjuda(Jogo *jogo, const Pergunta *pergunta, ResultadoMinigame resultado);
 
 /** @brief Indica se o jogador ainda pode girar a roleta de dificuldade nesta rodada. */

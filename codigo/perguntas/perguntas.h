@@ -20,6 +20,7 @@ const char *nomeDificuldade(Dificuldade dificuldade);
 
 enum { LIMITE_TEXTO_PERGUNTA = 200 };
 
+// Registro do banco. O DAT guarda estes campos na ordem em que estão na memória.
 typedef struct {
     char conteudo_da_pergunta[LIMITE_TEXTO_PERGUNTA + 1];
     char alternativas[4][LIMITE_TEXTO_PERGUNTA + 1];
@@ -28,6 +29,8 @@ typedef struct {
     Categoria categorias;
 } Pergunta;
 
+// "quantidade" é o número de posições em uso e "capacidade" é o espaço alocado.
+// "usadas[i]" acompanha "perguntas[i]" apenas durante a partida e não vai para o DAT.
 typedef struct {
     int quantidade;
     int capacidade;
@@ -38,7 +41,7 @@ typedef struct {
 /**
  * @brief Cria o banco vazio com a capacidade inicial.
  * @param banco banco a inicializar
- * @return 1 se deu certo, 0 se faltou memoria
+ * @return 1 se deu certo, 0 se faltou memória
  */
 int inicializaBanco(BancoPerguntas *banco);
 
@@ -79,7 +82,7 @@ int lerPergunta(Pergunta *perguntas);
  * @brief Adiciona uma pergunta, aumentando o vetor se precisar.
  * @param banco banco de perguntas
  * @param perguntas pergunta a adicionar
- * @return 1 se deu certo, 0 se faltou memoria
+ * @return 1 se deu certo, 0 se faltou memória ou a pergunta é inválida
  */
 int adicionaPerguntas(BancoPerguntas *banco, const Pergunta *perguntas);
 

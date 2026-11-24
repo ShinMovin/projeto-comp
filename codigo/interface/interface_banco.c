@@ -10,6 +10,12 @@ static const Color corAvisoBanco = {244, 202, 111, 255};
 static const Color corSucessoBanco = {137, 222, 171, 255};
 static const Rectangle areasSeletores[] = {{35, 397, 165, 42}, {216, 397, 238, 42}, {470, 397, 296, 42}};
 
+// A mesma área recebe o clique e desenha o campo do formulário.
+static Rectangle areaCampoTexto(int indice)
+{
+    return (Rectangle){175, 83 + indice * 56, 591, 42};
+}
+
 void iniciarEditorBanco(EditorBanco *editor)
 {
     *editor = (EditorBanco){.selecionada = -1, .edicao = -1};
@@ -118,9 +124,6 @@ static void desenharAvisos(const EditorBanco *editor, const ArquivosBanco *arqui
         DrawText(editor->mensagem, 35, 508, 14, editor->erro ? corErroBanco : corSucessoBanco);
     else if (arquivos->somenteLeitura)
         DrawText("Um arquivo está inválido ou ilegível. Banco aberto para consulta.", 35, 508, 14, corAvisoBanco);
-    else if (arquivos->somenteDat || arquivos->somenteCsv)
-        DrawText(TextFormat("Registros preservados de apenas um formato  DAT %d  CSV %d",
-                            arquivos->somenteDat, arquivos->somenteCsv), 35, 508, 14, corAvisoBanco);
 }
 
 static void abrirFormulario(EditorBanco *editor, const BancoPerguntas *banco, int indice)
@@ -315,12 +318,15 @@ static void editarSeletores(EditorBanco *editor, bool ativo)
     for (int i = 0; i < 3; i++)
     {
         bool clicou = ativo && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), areasSeletores[i]);
-        if (clicou)
-            editor->campo = 5 + i;
         bool foco = editor->campo == 5 + i;
         if (ativo && foco)
         {
-            int passo = clicou || IsKeyPressed(KEY_RIGHT) ? 1 : IsKeyPressed(KEY_LEFT) ? -1 : 0;
+            int passo = 0;
+            if (clicou || IsKeyPressed(KEY_RIGHT))
+                passo = 1;
+            else if (IsKeyPressed(KEY_LEFT))
+                passo = -1;
+            // Soma o total antes do resto para voltar da primeira opção à última.
             valores[i] = (valores[i] + opcoes[i] + passo) % opcoes[i];
             int codigo;
             while ((codigo = GetCharPressed()) != 0)
@@ -335,9 +341,13 @@ static void editarSeletores(EditorBanco *editor, bool ativo)
                     valores[i] = codigo - '1';
             }
         }
-        const char *valor = i == 0 ? TextFormat("%c", 'A' + valores[i]) :
-                            i == 1 ? TextFormat("Nível %d", valores[i] + 1) :
-                            nomeCategoria((Categoria)(valores[i] + 1));
+        const char *valor;
+        if (i == 0)
+            valor = TextFormat("%c", 'A' + valores[i]);
+        else if (i == 1)
+            valor = TextFormat("Nível %d", valores[i] + 1);
+        else
+            valor = nomeCategoria((Categoria)(valores[i] + 1));
         DrawText(rotulos[i], (int)areasSeletores[i].x, 374, 17, COR_DOURADO);
         desenharCampo(valor, "", areasSeletores[i], foco);
         DrawText(">", (int)(areasSeletores[i].x + areasSeletores[i].width) - 23, 409, 17, COR_DOURADO);
@@ -363,8 +373,7 @@ static void desenharFormulario(EditorBanco *editor, bool ativo)
     {
         for (int i = 0; i < 5; i++)
         {
-            Rectangle area = {175, 83 + i * 56, 591, 42};
-            if (CheckCollisionPointRec(GetMousePosition(), area))
+            if (CheckCollisionPointRec(GetMousePosition(), areaCampoTexto(i)))
                 editor->campo = i;
         }
         for (int i = 0; i < 3; i++)
@@ -376,7 +385,7 @@ static void desenharFormulario(EditorBanco *editor, bool ativo)
 
     for (int i = 0; i < 5; i++)
     {
-        Rectangle area = {175, 83 + i * 56, 591, 42};
+        Rectangle area = areaCampoTexto(i);
         bool foco = editor->campo == i;
         if (ativo && foco && editarTexto(campos[i], LIMITE_TEXTO_PERGUNTA))
             mensagem(editor, "Limite de 200 bytes neste campo.", true);

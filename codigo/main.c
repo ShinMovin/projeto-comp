@@ -24,6 +24,7 @@ static const char *caminhoDados(const char *arquivo)
     return TextFormat("%s../dados/%s", GetApplicationDirectory(), arquivo);
 }
 
+// Dados da partida e das telas que a acompanham. O banco é compartilhado com o editor.
 typedef struct
 {
     Jogo jogo;
@@ -70,6 +71,28 @@ static void avancarPartida(PartidaGrafica *partida, const BancoPerguntas *banco)
         prepararRoleta(partida, banco);
 }
 
+// Atualiza só o que está visível. Durante uma ajuda, o relógio da pergunta fica parado.
+static void atualizarPartida(PartidaGrafica *partida, const BancoPerguntas *banco, float segundos)
+{
+    Jogo *jogo = &partida->jogo;
+    if (partida->ajudas.tela != DESAFIOS_FECHADOS)
+    {
+        const Pergunta *pergunta = &banco->perguntas[jogo->indicePergunta];
+        atualizarDesafios(&partida->ajudas, jogo, pergunta, segundos);
+        return;
+    }
+
+    atualizarJogo(jogo, banco, segundos);
+    if (jogo->estado == SORTEA)
+    {
+        if (partida->naRoletaDificuldade)
+            atualizarRoletaDificuldade(&partida->roletaDificuldade, segundos);
+        else
+            atualizarRoleta(&partida->roleta, segundos);
+    }
+}
+
+// Desenha o estado atual e devolve a tela que o loop deve mostrar no próximo quadro.
 static Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
 {
     Jogo *jogo = &partida->jogo;
@@ -83,8 +106,9 @@ static Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
         return TELA_JOGAR;
     }
 
-    if (jogo->estado == NOVO_NIVEL)
+    switch (jogo->estado)
     {
+    case NOVO_NIVEL:
         if (desenharNovoNivel(jogo))
         {
             jogo->estado = SORTEA;
@@ -92,16 +116,14 @@ static Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
             prepararRoleta(partida, banco);
         }
         return TELA_JOGAR;
-    }
 
-    if (jogo->estado == SORTEA && partida->naRoletaDificuldade)
+    case SORTEA:
     {
-        desenharEtapaDificuldade(partida, banco);
-        return TELA_JOGAR;
-    }
-
-    if (jogo->estado == SORTEA)
-    {
+        if (partida->naRoletaDificuldade)
+        {
+            desenharEtapaDificuldade(partida, banco);
+            return TELA_JOGAR;
+        }
         AcaoRoleta acao = desenharRoleta(&partida->roleta, partida->avisoRoleta, jogo->dificuldade,
                                          podeGirarDificuldade(jogo));
         if (acao == ROLETA_VOLTAR || IsKeyPressed(KEY_BACKSPACE))
@@ -118,7 +140,8 @@ static Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
         return TELA_JOGAR;
     }
 
-    if (jogo->estado == VITORIA || jogo->estado == DERROTA)
+    case VITORIA:
+    case DERROTA:
     {
         AcaoResultado acao = desenharResultado(jogo);
         if (acao == RESULTADO_MENU || IsKeyPressed(KEY_BACKSPACE))
@@ -126,6 +149,9 @@ static Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
         if (acao == RESULTADO_NOVA_PARTIDA)
             iniciarPartida(partida, banco);
         return TELA_JOGAR;
+    }
+    default:
+        break; // Os demais estados da partida usam a mesma tela da pergunta.
     }
 
     const Pergunta *pergunta = &banco->perguntas[jogo->indicePergunta];
@@ -153,6 +179,7 @@ static Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
     return TELA_JOGAR;
 }
 
+// Quando chamado pelo terminal, o banco já está aberto e a trava continua com o terminal.
 static void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool travaTerminal)
 {
     InitWindow(800, 600, "Jogo do Milhão");
@@ -174,7 +201,9 @@ static void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool tra
         bool fechamento = WindowShouldClose();
         bool emDesafio = tela == TELA_MINIGAMES ||
                          (tela == TELA_JOGAR && partida.ajudas.tela != DESAFIOS_FECHADOS);
-        if ((fechamento && !fechamentoAnterior) || (!emDesafio && IsKeyPressed(KEY_ESCAPE)))
+        bool fechouJanela = fechamento && !fechamentoAnterior;
+        bool pediuParaSair = !emDesafio && IsKeyPressed(KEY_ESCAPE);
+        if (fechouJanela || pediuParaSair)
         {
             if (tela != TELA_BANCO || !editorTemAlteracoes(&editor))
                 break;
@@ -184,24 +213,11 @@ static void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool tra
 
         float tempoQuadro = GetFrameTime();
         if (tela == TELA_JOGAR)
-        {
-            if (partida.ajudas.tela != DESAFIOS_FECHADOS)
-            {
-                const Pergunta *pergunta = &banco->perguntas[partida.jogo.indicePergunta];
-                atualizarDesafios(&partida.ajudas, &partida.jogo, pergunta, tempoQuadro);
-            }
-            else
-            {
-                atualizarJogo(&partida.jogo, banco, tempoQuadro);
-                if (partida.jogo.estado == SORTEA && partida.naRoletaDificuldade)
-                    atualizarRoletaDificuldade(&partida.roletaDificuldade, tempoQuadro);
-                else if (partida.jogo.estado == SORTEA)
-                    atualizarRoleta(&partida.roleta, tempoQuadro);
-            }
-        }
+            atualizarPartida(&partida, banco, tempoQuadro);
         else if (tela == TELA_MINIGAMES)
             atualizarDesafios(&treino, NULL, NULL, tempoQuadro);
 
+        Tela telaAnterior = tela;
         BeginDrawing();
         switch (tela)
         {
@@ -258,7 +274,10 @@ static void menuGrafico(BancoPerguntas *banco, ArquivosBanco *arquivos, bool tra
         }
 
         EndDrawing();
-        if (!travaTerminal && tela != TELA_JOGAR && tela != TELA_BANCO)
+        // A sessão gráfica só tem a posse do banco durante a partida ou o editor.
+        bool saiuPartida = telaAnterior == TELA_JOGAR && tela != TELA_JOGAR;
+        bool saiuEditor = telaAnterior == TELA_BANCO && tela != TELA_BANCO;
+        if (!travaTerminal && (saiuPartida || saiuEditor))
             fecharBancoArquivos(arquivos);
     }
 
@@ -292,8 +311,6 @@ static bool salvarTerminal(ArquivosBanco *arquivos, BancoPerguntas *banco)
 
 static void menuTerminal(BancoPerguntas *banco, ArquivosBanco *arquivos)
 {
-    if (arquivos->somenteDat || arquivos->somenteCsv)
-        printf("Registros exclusivos preservados: DAT %d, CSV %d.\n", arquivos->somenteDat, arquivos->somenteCsv);
     if (arquivos->somenteLeitura)
         puts("Um arquivo está inválido ou ilegível. Banco aberto para consulta.");
 

@@ -19,7 +19,7 @@ static void conquistarRodada(Jogo *jogo)
 {
     // Diminuir não tira nada; aumentar soma um bônus que acompanha o prêmio até o fim.
     jogo->bonus += bonusDificuldade(jogo->rodada, dificuldadeRodada(jogo->rodada), jogo->dificuldade);
-    jogo->premio = valorRodada(jogo->rodada) + jogo->bonus;
+    jogo->premio = premioComBonus(jogo->rodada, jogo->bonus);
     if (rodadaTemCheckpoint(jogo->rodada))
     {
         jogo->premioGarantido = jogo->premio;
@@ -157,9 +157,14 @@ bool avancarRodada(Jogo *jogo)
 
 bool ajudaDisponivel(const Jogo *jogo, TipoMinigame tipo)
 {
-    return tipo > SEM_MINIGAME && tipo < QUANTIDADE_MINIGAMES && jogo->estado == PERGUNTA &&
-           jogo->ajudaAtiva == SEM_MINIGAME && !jogo->ajudasUsadas[tipo] &&
-           (tipo != GUITAR_HERO || jogo->rodada < TOTAL_RODADAS - 1);
+    // Valida o tipo antes de usar seu número como índice do vetor de tentativas.
+    if (tipo <= SEM_MINIGAME || tipo >= QUANTIDADE_MINIGAMES)
+        return false;
+    if (jogo->estado != PERGUNTA || jogo->ajudaAtiva != SEM_MINIGAME || jogo->ajudasUsadas[tipo])
+        return false;
+    if (tipo == GUITAR_HERO && jogo->rodada == TOTAL_RODADAS - 1)
+        return false;
+    return true;
 }
 
 bool iniciarAjuda(Jogo *jogo, TipoMinigame tipo)

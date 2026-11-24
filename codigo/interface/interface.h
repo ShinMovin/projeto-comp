@@ -39,6 +39,7 @@ Tela desenharMenu(void);
 bool desenharComoJogar(int *pagina);
 void desenharFundo(void);
 bool desenharBotao(const char *texto, Rectangle area);
+/** @brief Ajusta texto UTF-8 ao retângulo, quebrando linhas e reduzindo a fonte se preciso. */
 void desenharTextoPergunta(const char texto[LIMITE_TEXTO_PERGUNTA + 1], Rectangle area,
                            int tamanho, bool centralizar, Color cor);
 AcaoPergunta desenharTelaPergunta(const Jogo *jogo, const Pergunta *pergunta);

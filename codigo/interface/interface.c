@@ -91,7 +91,7 @@ static const Color corAcerto = {112, 224, 163, 255};
 static const Color corErro = {255, 135, 145, 255};
 static const Color corLegenda = {176, 184, 208, 255};
 
-enum { CAPACIDADE_TEXTO = sizeof(((Pergunta *)0)->conteudo_da_pergunta) };
+enum { CAPACIDADE_TEXTO = LIMITE_TEXTO_PERGUNTA + 1 };
 
 static const char *emReais(int valor)
 {
@@ -107,40 +107,42 @@ static void textoADireita(const char *texto, int direita, int y, int tamanho, Co
     DrawText(texto, direita - MeasureText(texto, tamanho), y, tamanho, cor);
 }
 
-static int quebrarLinhas(const char *inicio, Font fonte, float tamanho, float largura,
+// Guarda cada linha no mesmo buffer e retorna quantas linhas foram produzidas.
+// "linhas" guarda só os endereços de início, válidos enquanto o buffer existir.
+static int quebrarLinhas(const char *texto, Font fonte, float tamanho, float largura,
                          char *buffer, const char **linhas)
 {
     int quantidade = 0;
-    while (*inicio)
+    int inicio = 0;
+    while (texto[inicio])
     {
-        const char *fim = inicio;
-        const char *ultimoEspaco = NULL;
+        int fim = inicio;
+        int ultimoEspaco = -1;
         char *linha = buffer;
-        while (*fim)
+        while (texto[fim] && texto[fim] != '\n')
         {
-            if (*fim == '\n')
-                break;
+            // O índice avança por um caractere inteiro, que pode ocupar vários bytes.
             int bytes;
-            GetCodepointNext(fim, &bytes);
-            size_t comprimento = (size_t)(fim - inicio) + bytes;
-            memcpy(linha + (fim - inicio), fim, (size_t)bytes);
+            GetCodepointNext(texto + fim, &bytes);
+            int comprimento = fim - inicio + bytes;
+            memcpy(linha + (fim - inicio), texto + fim, (size_t)bytes);
             linha[comprimento] = '\0';
             if (fim > inicio && MeasureTextEx(fonte, linha, tamanho, 1).x > largura)
                 break;
-            if (*fim == ' ' && fim > inicio)
+            if (texto[fim] == ' ' && fim > inicio)
                 ultimoEspaco = fim;
             fim += bytes;
         }
-        if (*fim && *fim != '\n' && ultimoEspaco)
+        if (texto[fim] && texto[fim] != '\n' && ultimoEspaco >= 0)
             fim = ultimoEspaco;
 
         linha[fim - inicio] = '\0';
         linhas[quantidade++] = linha;
         buffer += fim - inicio + 1;
         inicio = fim;
-        if (*inicio == '\n')
+        if (texto[inicio] == '\n')
             inicio++;
-        while (*inicio == ' ')
+        while (texto[inicio] == ' ')
             inicio++;
     }
     return quantidade;
@@ -152,8 +154,13 @@ void desenharTextoPergunta(const char texto[LIMITE_TEXTO_PERGUNTA + 1], Rectangl
     char copia[CAPACIDADE_TEXTO];
     char buffer[2 * CAPACIDADE_TEXTO];
     const char *linhas[CAPACIDADE_TEXTO];
-    memcpy(copia, texto, sizeof copia);
-    copia[sizeof copia - 1] = '\0';
+    int bytes = 0;
+    while (bytes < LIMITE_TEXTO_PERGUNTA && texto[bytes])
+    {
+        copia[bytes] = texto[bytes];
+        bytes++;
+    }
+    copia[bytes] = '\0';
     if (!copia[0])
         return;
 
@@ -352,8 +359,11 @@ AcaoPergunta desenharTelaPergunta(const Jogo *jogo, const Pergunta *pergunta)
     {
         case PERGUNTA:
         {
-            const char *status = jogo->segundaChance ? "Segunda chance ativa" :
-                                 jogo->respostaBloqueada ? "Segunda chance utilizada" : NULL;
+            const char *status = NULL;
+            if (jogo->segundaChance)
+                status = "Segunda chance ativa";
+            else if (jogo->respostaBloqueada)
+                status = "Segunda chance utilizada";
             DrawText(TextFormat("Ajudas disponíveis: %d", contarAjudasDisponiveis(jogo)),
                      229, status ? 532 : 542, 17, corLegenda);
             if (status)

@@ -219,8 +219,9 @@ static const TipoAlvo tipos[] = {
 };
 static const float esperasIniciais[] = {0.0f, 0.65f, 2.0f, 4.0f, 1.25f};
 
-typedef struct
+struct SessaoTiro
 {
+    // Os alvos têm relógios próprios. "restante" pertence à contagem ou à partida.
     Alvo alvos[FALSO + 1];
     int pontos;
     int tela;
@@ -228,15 +229,15 @@ typedef struct
     Music trilha;
     Sound somAcerto;
     ResultadoMinigame resultado;
-} SessaoTiro;
+};
 
-static const char *NomeOpcaoTiro(bool treino, int opcao)
+const char *NomeOpcaoTiro(bool treino, int opcao)
 {
     (void)treino;
     return opcao >= 0 && (size_t)opcao < sizeof faixas / sizeof faixas[0] ? faixas[opcao].nome : NULL;
 }
 
-static void *IniciarTiro(bool treino, int opcao)
+SessaoTiro *IniciarTiro(bool treino, int opcao)
 {
     if (!NomeOpcaoTiro(treino, opcao))
         return NULL;
@@ -283,9 +284,8 @@ static void *IniciarTiro(bool treino, int opcao)
     return sessao;
 }
 
-static ResultadoMinigame AtualizarTiro(void *dados, float dt)
+ResultadoMinigame AtualizarTiro(SessaoTiro *sessao, float dt)
 {
-    SessaoTiro *sessao = dados;
     if (sessao->resultado != MINIGAME_EM_CURSO)
         return sessao->resultado;
     sessao->restante -= dt;
@@ -366,9 +366,8 @@ static ResultadoMinigame AtualizarTiro(void *dados, float dt)
     return sessao->resultado;
 }
 
-static void DesenharTiro(const void *dados)
+void DesenharTiro(const SessaoTiro *sessao)
 {
-    const SessaoTiro *sessao = dados;
     ClearBackground(BLACK);
     DesenharCabine(janelas);
     if (sessao->tela == TELA_CONTAGEM)
@@ -409,15 +408,13 @@ static void DesenharTiro(const void *dados)
         textoCentralizado("Comece!", 546, 30, GREEN);
 }
 
-static PlacarMinigame PlacarTiro(const void *dados)
+PlacarMinigame PlacarTiro(const SessaoTiro *sessao)
 {
-    const SessaoTiro *sessao = dados;
     return (PlacarMinigame){.pontos = sessao->pontos};
 }
 
-static void EncerrarTiro(void *dados)
+void EncerrarTiro(SessaoTiro *sessao)
 {
-    SessaoTiro *sessao = dados;
     if (IsMusicValid(sessao->trilha))
     {
         StopMusicStream(sessao->trilha);
@@ -431,15 +428,6 @@ static void EncerrarTiro(void *dados)
     free(sessao);
 }
 
-const Minigame tiroAoAlvo = {
-    .nomeOpcao = NomeOpcaoTiro,
-    .iniciar = IniciarTiro,
-    .atualizar = AtualizarTiro,
-    .desenhar = DesenharTiro,
-    .placar = PlacarTiro,
-    .encerrar = EncerrarTiro
-};
-
 #ifdef TIROALVO_INDEPENDENTE
 int main(void)
 {
@@ -452,7 +440,7 @@ int main(void)
     SessaoTiro *sessao = NULL;
     while (!WindowShouldClose())
     {
-        if (tela == TELA_JOGO && tiroAoAlvo.atualizar(sessao, GetFrameTime()) != MINIGAME_EM_CURSO)
+        if (tela == TELA_JOGO && AtualizarTiro(sessao, GetFrameTime()) != MINIGAME_EM_CURSO)
         {
             if (IsMusicValid(sessao->trilha))
                 StopMusicStream(sessao->trilha);
@@ -463,7 +451,7 @@ int main(void)
         ClearBackground(BLACK);
         bool sair = false;
         if (tela == TELA_JOGO)
-            tiroAoAlvo.desenhar(sessao);
+            DesenharTiro(sessao);
         else
         {
             DesenharCabine(janelas);
@@ -476,7 +464,7 @@ int main(void)
                 textoCentralizado(TextFormat("Faixa: %s", faixas[faixaEscolhida].nome), 461, 18, COR_ACENTO);
                 if (Botao((Rectangle){290, 262, 220, 50}, "Jogar", false))
                 {
-                    sessao = tiroAoAlvo.iniciar(true, faixaEscolhida);
+                    sessao = IniciarTiro(true, faixaEscolhida);
                     if (sessao)
                         tela = TELA_JOGO;
                 }
@@ -502,7 +490,7 @@ int main(void)
                 textoCentralizado(TextFormat("Pontuação final: %d / %d", sessao->pontos, META_PONTOS), 245, 24, WHITE);
                 if (Botao((Rectangle){290, 330, 220, 52}, "Voltar ao menu", false))
                 {
-                    tiroAoAlvo.encerrar(sessao);
+                    EncerrarTiro(sessao);
                     sessao = NULL;
                     tela = TELA_MENU;
                 }
@@ -514,7 +502,7 @@ int main(void)
     }
 
     if (sessao)
-        tiroAoAlvo.encerrar(sessao);
+        EncerrarTiro(sessao);
     if (IsAudioDeviceReady())
         CloseAudioDevice();
     CloseWindow();
