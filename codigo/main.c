@@ -405,7 +405,6 @@ int main(int argc, char **argv)
     int resultado = 0;
     if (terminal)
     {
-        configurarTerminalUtf8();
         const char *erro = abrirBancoArquivos(&arquivos, &banco);
         if (erro)
         {

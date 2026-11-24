@@ -1,7 +1,6 @@
 #ifndef BANCO_ARQUIVOS_H
 #define BANCO_ARQUIVOS_H
 
-#include <stdint.h>
 #include "perguntas.h"
 
 enum { CAMINHO_BANCO_MAXIMO = 4096 };
@@ -10,7 +9,7 @@ enum { CAMINHO_BANCO_MAXIMO = 4096 };
 typedef struct
 {
     char pasta[CAMINHO_BANCO_MAXIMO];
-    intptr_t trava;
+    int trava;               // descritor do arquivo .banco-lock (flock)
     bool bloqueado;
     bool somenteLeitura;
 } ArquivosBanco;
@@ -23,6 +22,5 @@ const char *recarregarBancoArquivos(ArquivosBanco *arquivos, BancoPerguntas *ban
 /** @brief Confere o DAT temporário antes de substituir o arquivo ativo. Retorna NULL ou erro. */
 const char *salvarBancoArquivos(ArquivosBanco *arquivos, const BancoPerguntas *banco);
 void fecharBancoArquivos(ArquivosBanco *arquivos);
-void configurarTerminalUtf8(void);
 
 #endif

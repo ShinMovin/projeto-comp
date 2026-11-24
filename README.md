@@ -4,22 +4,11 @@ O [Guia do código](GUIA_DO_CODIGO.md) apresenta a estrutura do projeto e a orde
 
 ## Compilar e executar
 
-Execute os comandos a partir da raiz do repositório. O Makefile detecta Windows ou Linux e grava o binário em `compilado/`. O jogo lê o banco em `dados/` a partir do diretório do executável, então mantenha essas pastas lado a lado.
-
-### Windows com MSYS2 UCRT64
-
-Com GCC, Make e Raylib para UCRT64 disponíveis, execute no PowerShell do VS Code:
-
-```powershell
-.\compilar.cmd
-.\compilar.cmd jogar
-```
-
-O primeiro comando gera `compilado/jogo.exe`. O segundo também abre o jogo. Para usar `--banco`, execute `.\compilado\jogo.exe --banco` com `ucrt64\bin` do MSYS2 no `PATH`.
+O projeto roda no **Linux**. Execute os comandos a partir da raiz do repositório. O Makefile grava o binário em `compilado/`. O jogo lê o banco em `dados/` a partir do diretório do executável, então mantenha essas pastas lado a lado.
 
 ### Linux
 
-Com GCC, Make e Raylib para Linux disponíveis, compile a partir da raiz do projeto.
+Com GCC, Make e Raylib instalados, compile a partir da raiz do projeto.
 
 ```bash
 make
@@ -35,7 +24,7 @@ Para abrir o gerenciamento pelo terminal, execute `./compilado/jogo --banco`.
 
 ### Recursos e banco de perguntas
 
-- O jogo carrega `dados/perguntas.dat` e usa `dados/perguntas.csv` como alternativa. O DAT legado depende do formato binário de `int`, `enum` e `Pergunta` utilizado pelo compilador. O CSV utiliza UTF-8 e aceita quebras LF ou CRLF.
+- O jogo carrega `dados/perguntas.dat` e usa `dados/perguntas.csv` como alternativa. O DAT guarda um `int` com a quantidade seguido do vetor de `Pergunta`. O CSV utiliza UTF-8 e aceita quebras LF ou CRLF.
 - Os alvos opcionais `guitarhero`, `tiroalvo` e `travessia` compilam os minigames independentes. O Makefile copia os áudios para `compilado/guitarhero-musicas/` e `compilado/audio-tiroalvo/`. No Linux, execute `make guitarhero tiroalvo travessia` a partir da raiz.
 
 ## Partida

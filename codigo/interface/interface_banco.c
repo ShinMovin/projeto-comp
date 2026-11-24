@@ -48,6 +48,8 @@ static bool editarTexto(char *texto, int maximo)
     size_t tamanho = strlen(texto);
     if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) && tamanho > 0)
     {
+        // Letras acentuadas ocupam 2 bytes em UTF-8 ('á' = 0xC3 0xA1). Os bytes do meio têm o
+        // formato 10xxxxxx (byte & 0xC0 == 0x80): volta por eles para apagar a letra inteira.
         do { tamanho--; } while (tamanho > 0 && ((unsigned char)texto[tamanho] & 0xC0) == 0x80);
         texto[tamanho] = '\0';
     }

@@ -32,7 +32,7 @@ Os caminhos de fontes abaixo são relativos a `codigo/`. Em geral, o `.h` declar
 | `minigames/guitarhero/mapas.h` | Vetores de notas. Cada linha relevante contém tempo de início, duração e trilha. |
 | `minigames/tiroalvo/tiroalvo.{c,h}` | Alvos, aparições, movimento, prioridade dos cliques, pontuação e áudio. |
 | `minigames/travessia/travessia.{c,h}` | Grade, geração das pistas, movimento, colisões, vidas e modos com meta ou infinito. |
-| `Makefile` e `compilar.cmd` na raiz | O Makefile lista fontes, bibliotecas e recursos e define `make` e `make run`. O atalho do Windows prepara o ambiente UCRT64 e usa o mesmo Makefile. |
+| `Makefile` na raiz | Lista fontes, bibliotecas e recursos e define `make` e `make run`. O projeto compila e roda no Linux. |
 
 Na raiz, `dados/` guarda o CSV inicial e o DAT ativo. `compilado/` recebe os executáveis e as cópias dos áudios. O `README.md` mostra como compilar e jogar. O `.gitignore` lista arquivos gerados pelo programa e pelo compilador.
 
@@ -105,7 +105,7 @@ Os leitores montam um banco candidato. Só substituem o banco original em memór
 3. Sincronizar e reabrir o temporário. Comparar cada pergunta relida com a que está em memória.
 4. Substituir o DAT ativo de uma vez. Em caso de falha antes da troca, o arquivo anterior continua disponível.
 
-A trava é um arquivo separado porque o DAT troca de nome durante o salvamento. No Windows, o código usa as chamadas de bloqueio da API do sistema. No Linux, usa `flock()`. Elas liberam a trava quando o descritor fecha. O código também reconhece o marcador antigo e recupera seu backup se encontrar uma gravação pendente de uma versão anterior. O CSV original é preservado e `--banco` permite exportar um novo CSV.
+A trava é um arquivo separado porque o DAT troca de nome durante o salvamento. O código usa `flock()`, do Linux, que libera a trava quando o descritor fecha. O código também reconhece o marcador antigo e recupera seu backup se encontrar uma gravação pendente de uma versão anterior. O CSV original é preservado e `--banco` permite exportar um novo CSV.
 
 ### UTF-8, pistas e áudio
 

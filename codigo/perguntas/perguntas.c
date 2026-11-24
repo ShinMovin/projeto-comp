@@ -107,17 +107,12 @@ static bool textoValido(const char *texto)
         int tamanho = tamanhoCaractereUtf8(byte);
         if (tamanho == 0 || fim - p < tamanho)
             return false;
+        // Os bytes de continuação de um caractere acentuado ficam entre 0x80 e 0xBF.
         for (int i = 1; i < tamanho; i++)
         {
             if (p[i] < 0x80 || p[i] > 0xBF)
                 return false;
         }
-        // Estas quatro bordas excluem codificações longas demais e valores reservados ou fora do Unicode.
-        unsigned char segundo = p[1];
-        if ((byte == 0xE0 && segundo < 0xA0) || (byte == 0xED && segundo > 0x9F))
-            return false;
-        if ((byte == 0xF0 && segundo < 0x90) || (byte == 0xF4 && segundo > 0x8F))
-            return false;
         p += tamanho;
         temConteudo = true;
     }
@@ -395,7 +390,7 @@ static int lerLinhaCsv(FILE *arq, char *linha, size_t capacidade)
 
 int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq)
 {
-    // Abre em modo binário para detectar bytes inválidos também no Windows.
+    // Abre em modo binário para ler os bytes exatamente como estão no arquivo.
     FILE *arq = fopen(nome_arq, "rb");
     if (!arq)
         return 0;
@@ -404,15 +399,12 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq)
     char linha[1200] = {0};
     if (ok)
     {
+        // A primeira linha precisa ser o cabeçalho esperado.
         ok = lerLinhaCsv(arq, linha, sizeof linha) > 0;
         if (ok)
         {
-            const char *inicio = linha;
-            if ((unsigned char)linha[0] == 0xEF && (unsigned char)linha[1] == 0xBB &&
-                (unsigned char)linha[2] == 0xBF)
-                inicio += 3;
             linha[strcspn(linha, "\r\n")] = '\0';
-            ok = strcmp(inicio, cabecalhoCsv) == 0;
+            ok = strcmp(linha, cabecalhoCsv) == 0;
         }
     }
 

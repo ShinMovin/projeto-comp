@@ -1,22 +1,14 @@
-#ifndef _WIN32
+// Libera as funções POSIX do Linux (fsync, fileno) mesmo compilando com -std=c99.
 #define _POSIX_C_SOURCE 200809L
-#endif
 #include "banco_arquivos.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <io.h>
-#else
-#include <fcntl.h>
 #include <sys/file.h>
+#include <sys/stat.h>
 #include <unistd.h>
-#endif
 
 static const char nomeCsv[] = "perguntas.csv";
 static const char nomeDat[] = "perguntas.dat";
@@ -39,43 +31,22 @@ bool inicializarArquivosBanco(ArquivosBanco *arquivos, const char *pasta)
     return true;
 }
 
-void configurarTerminalUtf8(void)
-{
-#ifdef _WIN32
-    SetConsoleCP(CP_UTF8);
-    SetConsoleOutputCP(CP_UTF8);
-#endif
-}
-
 // O sistema libera a trava ao fechar o descritor, inclusive ao encerrar o processo.
 static bool tentarBloquear(ArquivosBanco *arquivos)
 {
     char local[CAMINHO_BANCO_MAXIMO];
     caminho(local, arquivos, ".banco-lock");
     // O arquivo da trava é separado porque a gravação troca o arquivo DAT.
-#ifdef _WIN32
-    HANDLE handle = CreateFileA(local, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (handle == INVALID_HANDLE_VALUE)
-        return false;
-    OVERLAPPED intervalo = {0};
-    if (!LockFileEx(handle, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &intervalo))
-    {
-        CloseHandle(handle);
-        return false;
-    }
-    arquivos->trava = (intptr_t)handle;
-#else
     int fd = open(local, O_CREAT | O_RDWR, 0666);
     if (fd < 0)
         return false;
+    // LOCK_NB: se outro programa já tem a trava, falha na hora em vez de esperar.
     if (flock(fd, LOCK_EX | LOCK_NB) != 0)
     {
         close(fd);
         return false;
     }
     arquivos->trava = fd;
-#endif
     arquivos->bloqueado = true;
     return true;
 }
@@ -84,14 +55,7 @@ void fecharBancoArquivos(ArquivosBanco *arquivos)
 {
     if (!arquivos->bloqueado)
         return;
-#ifdef _WIN32
-    OVERLAPPED intervalo = {0};
-    HANDLE handle = (HANDLE)arquivos->trava;
-    UnlockFileEx(handle, 0, 1, 0, &intervalo);
-    CloseHandle(handle);
-#else
-    close((int)arquivos->trava);
-#endif
+    close(arquivos->trava);
     arquivos->bloqueado = false;
 }
 
@@ -106,11 +70,7 @@ static int estadoArquivo(const char *caminhoArquivo)
 // Troca o destino em uma única operação. Os dois caminhos ficam na mesma pasta.
 static bool substituirArquivo(const char *origem, const char *destino)
 {
-#ifdef _WIN32
-    return MoveFileExA(origem, destino, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
-#else
     return rename(origem, destino) == 0;
-#endif
 }
 
 static bool removerArquivo(const char *local)
@@ -123,11 +83,7 @@ static bool sincronizar(FILE *arquivo)
 {
     if (fflush(arquivo) != 0)
         return false;
-#ifdef _WIN32
-    return _commit(_fileno(arquivo)) == 0;
-#else
     return fsync(fileno(arquivo)) == 0;
-#endif
 }
 
 static bool sincronizarArquivo(const char *local)
