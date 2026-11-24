@@ -25,7 +25,8 @@
 #define DURACAO_CONTAGEM 2.0f
 #define DURACAO_INVENCIVEL 0.8f
 #define DURACAO_AVISO_TREM 1.0f           // a luz pisca este tempo antes do trem aparecer
-#define LINHA_JOGADOR_TELA 3               // a câmera tenta manter o jogador 3 pistas acima do fundo
+#define LINHA_JOGADOR_TELA 3
+#define FOLGA_CARRO 6.0f                   // pixels de cada ponta do carro que não contam como batida               // a câmera tenta manter o jogador 3 pistas acima do fundo
 
 static const Color corGramaClara = {86, 150, 78, 255};
 static const Color corGramaEscura = {74, 136, 68, 255};
@@ -284,11 +285,15 @@ static bool atropelado(SessaoTravessia *sessao)
     const Pista *p = pista(sessao, sessao->linha);
     if (p->tipo != PISTA_RUA && p->tipo != PISTA_TRILHO)
         return false;
+    // Na primeira metade do pulo o personagem ainda está saindo da pista anterior: não conta.
+    if (sessao->pulo > DURACAO_PULO / 2)
+        return false;
     // Todos estão na mesma pista, então basta comparar na horizontal.
-    Rectangle jogador = {sessao->coluna * CELULA + sessao->arrasto + 10.0f, 0, CELULA - 20.0f, 1};
+    // As caixas são um pouco menores que o desenho (cantos arredondados), para a batida parecer justa.
+    Rectangle jogador = {sessao->coluna * CELULA + sessao->arrasto + 13.0f, 0, CELULA - 26.0f, 1};
     for (int c = 0; c < p->quantidadeCarros; c++)
     {
-        Rectangle carro = {p->carros[c], 0, p->larguraCarro, 1};
+        Rectangle carro = {p->carros[c] + FOLGA_CARRO, 0, p->larguraCarro - 2 * FOLGA_CARRO, 1};
         if (CheckCollisionRecs(jogador, carro))
             return true;
     }
