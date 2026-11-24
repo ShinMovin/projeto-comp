@@ -20,6 +20,7 @@
 #define DISTANCIA_ACERTO 35.0f
 #define DISTANCIA_PERFEITO 8.0f
 #define DISTANCIA_OTIMO 20.0f
+#define TOLERANCIA_SOLTURA 0.30f
 #define DURACAO_MENSAGEM 0.75f
 #define DURACAO_PULSO 0.24f
 #define MAX_ERROS 3
@@ -245,10 +246,18 @@ static void AtualizarPartida(Partida *partida, float tempo)
         Nota *nota = &partida->notas[i];
         if (nota->estado == SUSTENTANDO)
         {
-            if (tempo >= nota->mapa.inicio + nota->mapa.duracao)
-                RegistrarAcerto(partida, nota, tempo);
-            else if (!IsKeyDown(teclas[nota->mapa.trilha]))
-                RegistrarErro(partida, nota, tempo, "Soltou cedo!");
+            float fim = nota->mapa.inicio + nota->mapa.duracao;
+            float toleranciaCedo = fminf(TOLERANCIA_SOLTURA, nota->mapa.duracao * 0.4f);
+
+            if (tempo > fim + TOLERANCIA_SOLTURA)
+                RegistrarErro(partida, nota, tempo, "Soltou tarde!");
+            else if (!IsKeyDown(teclas[nota->mapa.trilha]) || tempo >= partida->duracao)
+            {
+                if (tempo < fim - toleranciaCedo)
+                    RegistrarErro(partida, nota, tempo, "Soltou cedo!");
+                else
+                    RegistrarAcerto(partida, nota, tempo);
+            }
         }
         else if (nota->estado == PENDENTE && (tempo - nota->mapa.inicio) * VELOCIDADE_NOTAS > DISTANCIA_ACERTO)
         {
@@ -345,7 +354,11 @@ static void DesenharPartida(const Partida *partida, float tempo)
         {
             float yCauda = y - nota->mapa.duracao * VELOCIDADE_NOTAS;
             if (nota->estado == SUSTENTANDO)
+            {
+                if (tempo >= nota->mapa.inicio + nota->mapa.duracao)
+                    continue;
                 y = LINHA_ACERTO;
+            }
             float topo = fmaxf(0, yCauda);
             if (y > topo)
             {
