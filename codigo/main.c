@@ -248,7 +248,7 @@ static bool salvarTerminal(ArquivosBanco *arquivos, BancoPerguntas *banco)
         puts(erro ? erro : "A alteração não foi salva. O banco em disco foi recarregado.");
         return !erro;
     }
-    puts("Banco salvo em perguntas.csv e perguntas.dat.");
+    puts("Banco salvo em perguntas.dat.");
     for (int nivel = MUITO_FACIL; nivel <= IMPOSSIVEL; nivel++)
     {
         if (contaPerguntasDistintas(banco, (Dificuldade)nivel) < RODADAS_POR_NIVEL)

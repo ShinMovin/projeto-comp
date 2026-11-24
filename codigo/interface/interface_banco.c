@@ -172,7 +172,7 @@ static bool salvarEditor(EditorBanco *editor, ArquivosBanco *arquivos, BancoPerg
     if (rascunhoAlterado(editor) && !aplicarFormulario(editor, banco))
         return false;
     const char *erro = salvarBancoArquivos(arquivos, banco);
-    mensagem(editor, erro ? erro : "Banco salvo em perguntas.csv e perguntas.dat.", erro != NULL);
+    mensagem(editor, erro ? erro : "Banco salvo em perguntas.dat.", erro != NULL);
     if (erro)
         return false;
     editor->alterado = false;

@@ -21,6 +21,8 @@
 static const char *const nomes[] = {"perguntas.csv", "perguntas.dat"};
 static const char *const novos[] = {".banco-csv.novo", ".banco-dat.novo"};
 static const char *const anteriores[] = {".banco-csv.anterior", ".banco-dat.anterior"};
+// Índice do .dat nos vetores acima. Só ele é gravado; o CSV original nunca é alterado.
+enum { ARQ_DAT = 1 };
 static const char marca[] = ".banco-pendente";
 static const char marcaNova[] = ".banco-pendente.novo";
 static const char restauracao[] = ".banco-restauracao";
@@ -192,8 +194,8 @@ static bool recuperarGravacao(const ArquivosBanco *arquivos)
         (existiam[0] != '0' && existiam[0] != '1') || (existiam[1] != '0' && existiam[1] != '1'))
         return false;
 
-    // Mantém os backups até restaurar os dois destinos. Assim, a recuperação pode ser repetida.
-    for (int i = 0; i < 2; i++)
+    // Mantém o backup até restaurar o destino. Assim, a recuperação pode ser repetida.
+    for (int i = ARQ_DAT; i < 2; i++)
     {
         char destino[CAMINHO_BANCO_MAXIMO], backup[CAMINHO_BANCO_MAXIMO], temp[CAMINHO_BANCO_MAXIMO];
         caminho(destino, arquivos, nomes[i]);
@@ -213,39 +215,6 @@ static bool recuperarGravacao(const ArquivosBanco *arquivos)
     return true;
 }
 
-static bool reunirBancos(ArquivosBanco *arquivos, BancoPerguntas *dat, const BancoPerguntas *csv)
-{
-    int quantidadeDat = dat->quantidade;
-    bool *comparadas = calloc((size_t)quantidadeDat + 1, sizeof *comparadas);
-    if (!comparadas)
-        return false;
-
-    // Compara todos os campos e preserva também a quantidade de ocorrências de cada registro.
-    arquivos->somenteDat = quantidadeDat;
-    for (int i = 0; i < csv->quantidade; i++)
-    {
-        int j = 0;
-        while (j < quantidadeDat && (comparadas[j] || !perguntasIguais(&dat->perguntas[j], &csv->perguntas[i])))
-            j++;
-        if (j < quantidadeDat)
-        {
-            comparadas[j] = true;
-            arquivos->somenteDat--;
-        }
-        else
-        {
-            if (!adicionaPerguntas(dat, &csv->perguntas[i]))
-            {
-                free(comparadas);
-                return false;
-            }
-            arquivos->somenteCsv++;
-        }
-    }
-    free(comparadas);
-    return true;
-}
-
 const char *recarregarBancoArquivos(ArquivosBanco *arquivos, BancoPerguntas *banco)
 {
     if (!arquivos->bloqueado || !recuperarGravacao(arquivos))
@@ -257,16 +226,16 @@ const char *recarregarBancoArquivos(ArquivosBanco *arquivos, BancoPerguntas *ban
     int existeCsv = estadoArquivo(localCsv);
     int existeDat = estadoArquivo(localDat);
     BancoPerguntas csv = {0}, dat = {0};
-    bool leuCsv = existeCsv == 1 && carregaPerguntas(&csv, localCsv);
+    // O .dat é o banco de verdade. O CSV é só a fonte inicial, lida quando ainda não há .dat.
     bool leuDat = existeDat == 1 && carregaBinario(&dat, localDat);
+    bool leuCsv = !leuDat && existeCsv == 1 && carregaPerguntas(&csv, localCsv);
 
     arquivos->somenteDat = 0;
     arquivos->somenteCsv = 0;
-    arquivos->somenteLeitura = (existeCsv != 0 && !leuCsv) || (existeDat != 0 && !leuDat);
+    // Um .dat corrompido não é sobrescrito: o banco abre só para consulta.
+    arquivos->somenteLeitura = existeDat != 0 && !leuDat;
     const char *erro = NULL;
-    if (leuDat && leuCsv && !reunirBancos(arquivos, &dat, &csv))
-        erro = "Memória insuficiente para comparar CSV e DAT.";
-    else if (!leuDat && !leuCsv && (existeDat != 0 || existeCsv != 0))
+    if (!leuDat && !leuCsv && (existeDat != 0 || existeCsv != 0))
         erro = "O CSV e o DAT estão indisponíveis ou inválidos.";
     else if (!leuDat && !leuCsv && !inicializaBanco(&dat))
         erro = "Memória insuficiente para abrir o banco.";
@@ -280,6 +249,10 @@ const char *recarregarBancoArquivos(ArquivosBanco *arquivos, BancoPerguntas *ban
     }
     liberaBancoPergunta(&csv);
     liberaBancoPergunta(&dat);
+
+    // Primeira execução: cria o .dat a partir do CSV. Se falhar, o jogo segue com o banco em memória.
+    if (!erro && leuCsv && existeDat == 0)
+        salvarBancoArquivos(arquivos, banco);
     return erro;
 }
 
@@ -313,10 +286,10 @@ const char *salvarBancoArquivos(ArquivosBanco *arquivos, const BancoPerguntas *b
 
     char originais[2][CAMINHO_BANCO_MAXIMO], temp[2][CAMINHO_BANCO_MAXIMO];
     char pendente[CAMINHO_BANCO_MAXIMO], pendenteNovo[CAMINHO_BANCO_MAXIMO];
-    char existiam[2];
+    char existiam[2] = {'1', '1'}; // a posição do CSV é ignorada na recuperação
     caminho(pendente, arquivos, marca);
     caminho(pendenteNovo, arquivos, marcaNova);
-    for (int i = 0; i < 2; i++)
+    for (int i = ARQ_DAT; i < 2; i++)
     {
         char backup[CAMINHO_BANCO_MAXIMO];
         caminho(originais[i], arquivos, nomes[i]);
@@ -340,8 +313,7 @@ const char *salvarBancoArquivos(ArquivosBanco *arquivos, const BancoPerguntas *b
     if (fclose(marcador) != 0 || !registrou || !substituirArquivo(pendenteNovo, pendente))
         return "Não foi possível preparar a confirmação do salvamento.";
 
-    if (!substituirArquivo(temp[0], originais[0]) || !substituirArquivo(temp[1], originais[1]) ||
-        !removerArquivo(pendente))
+    if (!substituirArquivo(temp[ARQ_DAT], originais[ARQ_DAT]) || !removerArquivo(pendente))
     {
         if (!recuperarGravacao(arquivos))
             return "Falha no salvamento. A recuperação será tentada na próxima abertura.";
