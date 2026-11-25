@@ -69,7 +69,6 @@ Tela desenharMenu(void)
         {"JOGAR", TELA_JOGAR},
         {"TESTAR MINIGAMES", TELA_MINIGAMES},
         {"COMO JOGAR", TELA_INSTRUCOES},
-        {"BANCO DE PERGUNTAS", TELA_BANCO},
         {"SAIR", TELA_SAIR}
     };
     Tela proximaTela = MENU_PRINCIPAL;

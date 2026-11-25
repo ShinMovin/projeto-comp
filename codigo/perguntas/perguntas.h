@@ -88,7 +88,6 @@ int adicionaPerguntas(BancoPerguntas *banco, const Pergunta *perguntas);
 
 /** @brief Retorna NULL quando todos os campos são válidos. */
 const char *validarPergunta(const Pergunta *pergunta);
-bool perguntasIguais(const Pergunta *a, const Pergunta *b);
 int contaPerguntasDistintas(const BancoPerguntas *banco, Dificuldade dificuldade);
 bool editarPerguntaPorIndice(BancoPerguntas *banco, int indice, const Pergunta *pergunta);
 bool excluirPerguntaPorIndice(BancoPerguntas *banco, int indice);

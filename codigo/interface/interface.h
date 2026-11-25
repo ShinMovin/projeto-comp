@@ -16,7 +16,6 @@ typedef enum
     TELA_JOGAR,
     TELA_MINIGAMES,
     TELA_INSTRUCOES,
-    TELA_BANCO,
     TELA_SAIR
 
 } Tela;

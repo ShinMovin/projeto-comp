@@ -14,13 +14,13 @@ Com GCC, Make e Raylib instalados, compile a partir da raiz do projeto.
 make
 ```
 
-Para abrir o jogo, use o comando abaixo. Ele também compila o necessário antes de executar.
+Para abrir o programa, use o comando abaixo. Ele também compila o necessário antes de executar.
 
 ```bash
 make run
 ```
 
-Para abrir o gerenciamento pelo terminal, execute `make run ARGS=--banco`. A opção **7 - Jogar** abre a interface gráfica a partir do terminal.
+O programa começa pelo menu do terminal, onde se cadastram as perguntas. A opção **7 - Jogar** abre a janela do jogo. Ao fechar a janela, o menu do terminal volta.
 
 ### Roteiro da apresentação
 
@@ -33,12 +33,12 @@ cp -R Makefile codigo "$pasta/"
 cp dados/perguntas.csv "$pasta/dados/"
 cd "$pasta"
 make
-make run ARGS=--banco
+make run
 ```
 
 1. Na primeira abertura, mostre a mensagem de criação de `dados/perguntas.dat`.
 2. Use **1 - Listar perguntas** e **2 - Cadastrar pergunta**. Liste de novo para ver o número da nova pergunta, depois use **4 - Alterar pergunta** com esse número.
-3. Use **0 - Sair**, mostre o arquivo com `ls -l dados/perguntas.dat` e reabra com `make run ARGS=--banco`.
+3. Use **0 - Sair**, mostre o arquivo com `ls -l dados/perguntas.dat` e reabra com `make run`.
 4. Use **1 - Listar perguntas** para mostrar a pergunta cadastrada com a alteração.
 5. Use **7 - Jogar**. Escolha **JOGAR**, gire a roleta, prossiga para a pergunta e clique em **PEDIR AJUDA**. Escolha um minigame para demonstrar a ajuda durante a partida.
 
@@ -53,7 +53,7 @@ A partida tem 15 perguntas. A dificuldade base aumenta a cada três rodadas. Ant
 
 ## Ajudas e treino
 
-Use **PEDIR AJUDA** na pergunta ou **TESTAR MINIGAMES** no menu principal. Ambos abrem os mesmos desafios dos minigames na janela de 800 × 600. O treino permite repetir desafios e funciona independentemente da partida.
+Use **PEDIR AJUDA** na pergunta ou **TESTAR MINIGAMES** no menu da janela. Ambos abrem os mesmos desafios dos minigames na janela de 800 × 600. O treino permite repetir desafios e funciona independentemente da partida.
 
 - **Guitar Hero** usa D, F, J e K. No modo de ajuda, acertar pelo menos 70% das notas da faixa concede o valor da rodada e libera o avanço pela roleta. A ajuda fica indisponível na pergunta do milhão.
 - **Tiro ao Alvo** exige 7.500 pontos em 30 segundos. A vitória elimina duas alternativas incorretas sorteadas.
@@ -63,13 +63,13 @@ Cada tentativa de ajuda é consumida ao iniciar o desafio, inclusive se ele for 
 
 ## Padrão para cadastrar perguntas
 
-Abra **BANCO DE PERGUNTAS** no menu principal para pesquisar, adicionar, editar ou excluir registros. Use **TAB** e **Shift+TAB** para mudar de campo, **Backspace** para apagar e **SALVAR BANCO** para gravar. A opção `--banco` oferece as mesmas operações pelo terminal, além da exportação para `dados/perguntas_exportadas.csv`.
+As perguntas são cadastradas só pelo menu do terminal, que abre com `make run`. Ele permite listar, cadastrar, pesquisar, alterar e excluir perguntas, além de exportar o banco para `dados/perguntas_exportadas.csv`.
 
 O jogo usa um DAT válido como fonte principal. Na primeira abertura sem DAT, lê o CSV e cria o arquivo binário. Se o DAT estiver inválido ou a criação falhar, o banco disponível abre para consulta.
 
-O terminal salva após cada cadastro, alteração ou exclusão. No editor gráfico, use **SALVAR BANCO**. Os dois usam `salvaBinario()` para gravar diretamente em `dados/perguntas.dat`. O CSV original fica disponível para importação. A exportação do terminal gera `dados/perguntas_exportadas.csv`.
+O terminal salva após cada cadastro, alteração ou exclusão, usando `salvaBinario()` para gravar diretamente em `dados/perguntas.dat`. O CSV original fica disponível para importação. A exportação do terminal gera `dados/perguntas_exportadas.csv`.
 
-Cada campo de texto aceita até 200 bytes em UTF-8. O editor avisa se algum nível ficar com menos de três enunciados distintos, necessários para as 15 rodadas.
+Cada campo de texto aceita até 200 bytes em UTF-8. O terminal avisa se algum nível ficar com menos de três enunciados distintos, necessários para as 15 rodadas.
 
 O arquivo `dados/perguntas.csv` usa a ordem abaixo.
 

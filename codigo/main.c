@@ -15,7 +15,6 @@
 #include <time.h>
 #include "interface.h"
 #include "interface_ajudas.h"
-#include "interface_banco.h"
 #include "jogo.h"
 #include "premio.h"
 #include "roleta.h"
@@ -53,7 +52,7 @@ bool abrirBanco(BancoPerguntas *banco, const char *caminhoDat, bool *somenteLeit
     return true;
 }
 
-// Dados da partida e das telas que a acompanham. O banco é compartilhado com o editor.
+// Dados da partida e das telas que a acompanham.
 typedef struct
 {
     Jogo jogo;
@@ -185,7 +184,7 @@ Tela desenharPartida(PartidaGrafica *partida, BancoPerguntas *banco)
     return TELA_JOGAR;
 }
 
-void menuGrafico(BancoPerguntas *banco, const char *caminhoDat, bool somenteLeitura)
+void menuGrafico(BancoPerguntas *banco)
 {
     InitWindow(800, 600, "Jogo do Milhão");
     SetTargetFPS(60);
@@ -196,8 +195,6 @@ void menuGrafico(BancoPerguntas *banco, const char *caminhoDat, bool somenteLeit
     int paginaInstrucoes = 0;
     PartidaGrafica partida = {0};
     Desafios treino = {0};
-    EditorBanco editor;
-    iniciarEditorBanco(&editor);
     const char *erroMenu = NULL;
     bool fechamentoAnterior = false;
 
@@ -209,11 +206,7 @@ void menuGrafico(BancoPerguntas *banco, const char *caminhoDat, bool somenteLeit
         bool fechouJanela = fechamento && !fechamentoAnterior;
         bool pediuParaSair = !emDesafio && IsKeyPressed(KEY_ESCAPE);
         if (fechouJanela || pediuParaSair)
-        {
-            if (tela != TELA_BANCO || !editorTemAlteracoes(&editor))
-                break;
-            editor.confirmacao = CONFIRMAR_FECHAR;
-        }
+            break;
         fechamentoAnterior = fechamento;
 
         float tempoQuadro = GetFrameTime();
@@ -231,15 +224,13 @@ void menuGrafico(BancoPerguntas *banco, const char *caminhoDat, bool somenteLeit
                 paginaInstrucoes = 0;
             if (tela == TELA_MINIGAMES)
                 abrirDesafios(&treino);
-            if (tela == TELA_JOGAR || tela == TELA_BANCO)
+            if (tela == TELA_JOGAR)
             {
                 erroMenu = banco->perguntas ? NULL : "Não foi possível carregar o banco de perguntas.";
                 if (erroMenu)
                     tela = MENU_PRINCIPAL;
-                else if (tela == TELA_JOGAR)
-                    iniciarPartida(&partida, banco);
                 else
-                    iniciarEditorBanco(&editor);
+                    iniciarPartida(&partida, banco);
             }
             if (erroMenu)
             {
@@ -251,14 +242,6 @@ void menuGrafico(BancoPerguntas *banco, const char *caminhoDat, bool somenteLeit
         case TELA_JOGAR:
             tela = desenharPartida(&partida, banco);
             break;
-
-        case TELA_BANCO:
-        {
-            AcaoEditor acao = desenharEditorBanco(&editor, banco, caminhoDat, somenteLeitura);
-            if (acao != EDITOR_CONTINUA)
-                tela = acao == EDITOR_MENU ? MENU_PRINCIPAL : TELA_SAIR;
-            break;
-        }
 
         case TELA_MINIGAMES:
             if (desenharDesafios(&treino, NULL))
@@ -377,7 +360,7 @@ void menuTerminal(BancoPerguntas *banco, const char *caminhoDat, bool somenteLei
             break;
 
         case 7:
-            menuGrafico(banco, caminhoDat, somenteLeitura);
+            menuGrafico(banco);
             break;
 
         case 0:
@@ -393,7 +376,7 @@ void menuTerminal(BancoPerguntas *banco, const char *caminhoDat, bool somenteLei
     }
 }
 
-int main(int argc, char **argv)
+int main(void)
 {
     BancoPerguntas banco = {0};
     char caminhoDat[4096];
@@ -407,18 +390,15 @@ int main(int argc, char **argv)
 
     bool somenteLeitura = false;
     bool carregouBanco = abrirBanco(&banco, caminhoDat, &somenteLeitura);
-    if (argc > 1 && strcmp(argv[1], "--banco") == 0)
+    if (!carregouBanco)
     {
-        if (!carregouBanco)
-        {
-            printf("Não foi possível carregar o banco de perguntas.\n");
-            liberaBancoPergunta(&banco);
-            return 1;
-        }
-        menuTerminal(&banco, caminhoDat, somenteLeitura);
+        printf("Não foi possível carregar o banco de perguntas.\n");
+        liberaBancoPergunta(&banco);
+        return 1;
     }
-    else
-        menuGrafico(&banco, caminhoDat, somenteLeitura);
+
+    // O cadastro é feito só pelo terminal. A opção 7 abre a janela do jogo.
+    menuTerminal(&banco, caminhoDat, somenteLeitura);
 
     liberaBancoPergunta(&banco);
     return 0;

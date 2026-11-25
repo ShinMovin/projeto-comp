@@ -98,20 +98,6 @@ const char *validarPergunta(const Pergunta *pergunta)
     return NULL;
 }
 
-//compara campo por campo (o editor usa para saber se algo mudou)
-bool perguntasIguais(const Pergunta *a, const Pergunta *b)
-{
-    if (a->alternativa_correta != b->alternativa_correta || a->dificuldades != b->dificuldades ||
-        a->categorias != b->categorias || strcmp(a->conteudo_da_pergunta, b->conteudo_da_pergunta) != 0)
-        return false;
-    for (int i = 0; i < 4; i++)
-    {
-        if (strcmp(a->alternativas[i], b->alternativas[i]) != 0)
-            return false;
-    }
-    return true;
-}
-
 //conta quantos enunciados diferentes existem em um nivel
 int contaPerguntasDistintas(const BancoPerguntas *banco, Dificuldade dificuldade)
 {

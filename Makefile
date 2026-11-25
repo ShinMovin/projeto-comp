@@ -18,7 +18,7 @@ INCLUDES_PROJETO = -Icodigo -Icodigo/interface -Icodigo/perguntas -Icodigo/jogo
 OPCOES_C = $(CPPFLAGS) $(INCLUDES_PROJETO) $(RAYLIB_CFLAGS) $(CFLAGS)
 DESENHO = codigo/interface/desenho.c
 FONTES = codigo/main.c $(DESENHO) \
-    codigo/interface/interface.c codigo/interface/interface_ajudas.c codigo/interface/interface_banco.c \
+    codigo/interface/interface.c codigo/interface/interface_ajudas.c \
     codigo/perguntas/perguntas.c \
     codigo/jogo/jogo.c codigo/jogo/premio.c codigo/jogo/roleta.c \
     codigo/minigames/minigame.c $(GUITARHERO_FONTES) $(TIROALVO_FONTES) $(TRAVESSIA_FONTES)
@@ -53,7 +53,7 @@ $(JOGO): $(FONTES) $(CABECALHOS) Makefile | $(GUITARHERO_AUDIO) $(TIROALVO_AUDIO
 	$(CC) $(OPCOES_C) $(FONTES) $(LDFLAGS) -o "$@" $(LIBS) $(LDLIBS)
 
 run: $(JOGO)
-	"./$(JOGO)" $(ARGS)
+	"./$(JOGO)"
 
 guitarhero: $(GUITARHERO)
 
