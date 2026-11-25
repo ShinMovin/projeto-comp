@@ -312,6 +312,11 @@ int carregaPerguntas(BancoPerguntas *banco, const char *nome_arq){
     }//if
 
     while(fgets(linha, sizeof(linha), arq) != NULL){
+        //linha em branco (por exemplo, no fim do arquivo) e ignorada
+        if(linha[0] == '\n' || linha[0] == '\r'){
+            continue;
+        }//if
+
         Pergunta pergunta;
         int i = 0;
 
@@ -424,6 +429,11 @@ int lerPergunta(Pergunta *perguntas, bool editando)
         {
             return 0; //acabou a entrada
         }
+        //se nao veio o Enter, a linha nao coube no vetor: joga o resto fora
+        if(strchr(texto, '\n') == NULL)
+        {
+            limpaEntrada();
+        }
         texto[strcspn(texto, "\n")] = '\0';
 
         if (strlen(texto) > 200)
@@ -452,6 +462,11 @@ int lerPergunta(Pergunta *perguntas, bool editando)
             if(fgets(texto, sizeof(texto), stdin) == NULL)
             {
                 return 0;
+            }
+            //se nao veio o Enter, a linha nao coube no vetor: joga o resto fora
+            if(strchr(texto, '\n') == NULL)
+            {
+                limpaEntrada();
             }
             texto[strcspn(texto, "\n")] = '\0';
 
@@ -645,6 +660,11 @@ int pesquisaPergunta(BancoPerguntas *banco)
     {
         return 0;
     }
+    //se nao veio o Enter, a linha nao coube no vetor: joga o resto fora
+    if(strchr(texto, '\n') == NULL)
+    {
+        limpaEntrada();
+    }
     texto[strcspn(texto, "\n")] = '\0';
 
     if(strlen(texto) == 0)
@@ -796,7 +816,9 @@ int salvaBinario(const BancoPerguntas *banco, const char *nome_arq)
     {
         ok = 0;
     }
-    if(fwrite(banco->perguntas, sizeof(Pergunta), banco->quantidade, arq) != (size_t)banco->quantidade)
+    //com o banco vazio nao ha vetor para gravar, so a quantidade 0
+    if(banco->quantidade > 0 &&
+       fwrite(banco->perguntas, sizeof(Pergunta), banco->quantidade, arq) != (size_t)banco->quantidade)
     {
         ok = 0;
     }
