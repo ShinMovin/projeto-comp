@@ -31,13 +31,6 @@
 #define MULTIPLICADOR_MAXIMO 4
 
 typedef enum {
-    TELA_MENU,
-    TELA_MUSICAS,
-    TELA_JOGO,
-    TELA_RESULTADO
-} Tela;
-
-typedef enum {
     PENDENTE,
     SUSTENTANDO,
     RESOLVIDA
@@ -116,16 +109,6 @@ const NivelPrecisao niveisGuitarra[NIVEIS_PRECISAO] = {
     {75, "Ótimo!", SKYBLUE},
     {50, "Bom!", GOLD}
 };
-
-#ifdef GUITARHERO_INDEPENDENTE
-bool botaoGuitarra(Rectangle area, const char *texto)
-{
-    bool sobreBotao = CheckCollisionPointRec(GetMousePosition(), area);
-    DrawRectangleRec(area, sobreBotao ? DARKGRAY : (Color){30, 30, 45, 255});
-    textoNoRetangulo(texto, area, 24, WHITE);
-    return sobreBotao && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-}
-#endif
 
 void prepararTreinoGuitarra(SessaoGuitarra *partida)
 {
@@ -379,34 +362,6 @@ void DesenharGuitarra(const SessaoGuitarra *partida)
             16, 129, 17, GOLD);
 }
 
-#ifdef GUITARHERO_INDEPENDENTE
-void desenharResultadoGuitarra(const SessaoGuitarra *partida)
-{
-    bool temFaixa = IsSoundValid(partida->somFaixa);
-    bool perdeu = !temFaixa && partida->erros >= MAX_ERROS;
-    const char *titulo = temFaixa ? "Faixa concluída!" : (perdeu ? "Você perdeu!" : "Você venceu!");
-    textoCentralizado(titulo, 94, 48, perdeu ? RED : GREEN);
-    if (perdeu)
-        textoCentralizado(partida->mensagem, 153, 22, partida->corMensagem);
-
-    int julgadas = partida->erros;
-    int pontosBase = 0;
-    for (int i = 0; i < NIVEIS_PRECISAO; i++)
-    {
-        julgadas += partida->acertos[i];
-        pontosBase += partida->acertos[i] * niveisGuitarra[i].pontos;
-    }
-    float precisao = julgadas > 0 ? (float)pontosBase / julgadas : 0.0f;
-    textoCentralizado(TextFormat("Pontuação final: %d", partida->pontos), 204, 28, WHITE);
-    textoCentralizado(TextFormat("Precisão: %.1f%%", precisao), 244, 24, WHITE);
-    textoCentralizado(TextFormat("Maior combo: %d", partida->maiorCombo), 281, 24, WHITE);
-    textoCentralizado(TextFormat("Perfeitos: %d   Ótimos: %d   Bons: %d",
-        partida->acertos[PERFEITO], partida->acertos[OTIMO], partida->acertos[BOM]), 332, 20, RAYWHITE);
-    textoCentralizado(textoErrosGuitarra(partida), 363, 20, RAYWHITE);
-}
-
-#endif
-
 const char *NomeOpcaoGuitarra(bool treino, int opcao)
 {
     if (treino && opcao == 0)
@@ -518,91 +473,3 @@ void EncerrarGuitarra(SessaoGuitarra *sessao)
     }
     free(sessao);
 }
-
-#ifdef GUITARHERO_INDEPENDENTE
-int main(void)
-{
-    InitWindow(LARGURA, ALTURA, "Guitar Hero - Base");
-    SetTargetFPS(60);
-    InitAudioDevice();
-
-    SessaoGuitarra *sessao = NULL;
-    Tela tela = TELA_MENU;
-    const char *erroFaixa = NULL;
-
-    while (!WindowShouldClose())
-    {
-        if (tela == TELA_JOGO && AtualizarGuitarra(sessao, GetFrameTime()) != MINIGAME_EM_CURSO)
-            tela = TELA_RESULTADO;
-
-        int iniciarOpcao = -1;
-        bool sair = false;
-        BeginDrawing();
-        ClearBackground(BLACK);
-        switch (tela)
-        {
-        case TELA_MENU:
-            textoCentralizado("Guitar Hero", 113, 48, WHITE);
-            textoCentralizado(TextFormat("Sobreviva por %d segundos", DURACAO_PARTIDA), 185, 20, WHITE);
-            textoCentralizado("D F J K  |  Segure as notas com cauda", 217, 20, LIGHTGRAY);
-            if (botaoGuitarra((Rectangle){290, 278, 220, 52}, "Jogar"))
-                iniciarOpcao = 0;
-            if (botaoGuitarra((Rectangle){290, 346, 220, 52}, "Músicas"))
-            {
-                tela = TELA_MUSICAS;
-                erroFaixa = NULL;
-            }
-            sair = botaoGuitarra((Rectangle){290, 414, 220, 52}, "Sair");
-            break;
-
-        case TELA_MUSICAS:
-            textoCentralizado("Músicas bônus", 48, 48, WHITE);
-            for (int i = 0; i < quantidadeFaixasGuitarra; i++)
-            {
-                if (botaoGuitarra((Rectangle){222, 140 + 56 * i, 356, 46}, faixasGuitarra[i].nome))
-                    iniciarOpcao = i + 1;
-            }
-            if (botaoGuitarra((Rectangle){290, 326, 220, 50}, "Treino livre"))
-                iniciarOpcao = 0;
-            if (botaoGuitarra((Rectangle){290, 396, 220, 50}, "Voltar"))
-                tela = TELA_MENU;
-            if (erroFaixa)
-                textoCentralizado(erroFaixa, 530, 20, ORANGE);
-            break;
-
-        case TELA_JOGO:
-            DesenharGuitarra(sessao);
-            break;
-
-        case TELA_RESULTADO:
-            desenharResultadoGuitarra(sessao);
-            if (botaoGuitarra((Rectangle){280, 438, 240, 52}, "Voltar ao menu"))
-            {
-                EncerrarGuitarra(sessao);
-                sessao = NULL;
-                tela = TELA_MENU;
-            }
-            break;
-        }
-        EndDrawing();
-
-        if (iniciarOpcao >= 0)
-        {
-            sessao = IniciarGuitarra(true, iniciarOpcao);
-            if (sessao)
-                tela = TELA_JOGO;
-            else
-                erroFaixa = "Não foi possível iniciar a faixa.";
-        }
-        if (sair)
-            break;
-    }
-
-    if (sessao)
-        EncerrarGuitarra(sessao);
-    if (IsAudioDeviceReady())
-        CloseAudioDevice();
-    CloseWindow();
-    return 0;
-}
-#endif

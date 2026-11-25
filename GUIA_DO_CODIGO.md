@@ -123,4 +123,4 @@ Na abertura, `abrirBanco()` tenta ler o DAT primeiro. Sem DAT, usa o CSV para cr
 2. Altere a duração de suspense em `jogo.c`. Teste uma resposta certa e uma errada para observar quando ocorre a revelação.
 3. Ajuste o valor de uma rodada intermediária em `valoresRodadas`. Confira a escada, a tela de instruções e o prêmio recebido em uma rodada de checkpoint.
 4. Adicione uma pergunta em uma cópia do banco pelo menu do terminal, pesquise um trecho do enunciado e confira a exportação CSV.
-5. No treino da Travessia, mude a duração da contagem inicial e explique por que isso altera o momento da primeira jogada. Use os alvos independentes do Makefile para testar mudanças em um minigame.
+5. No treino da Travessia, mude a duração da contagem inicial e explique por que isso altera o momento da primeira jogada. Use **TESTAR MINIGAMES** para testar mudanças em um minigame.

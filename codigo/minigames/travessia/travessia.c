@@ -546,39 +546,3 @@ void EncerrarTravessia(SessaoTravessia *sessao)
 {
     free(sessao);
 }
-
-#ifdef TRAVESSIA_INDEPENDENTE
-// Para testar só o minigame, execute make run-travessia na raiz.
-int main(void)
-{
-    InitWindow(LARGURA, ALTURA, "Travessia");
-    SetTargetFPS(60);
-    SessaoTravessia *sessao = IniciarTravessia(true, 0);
-    while (sessao && !WindowShouldClose())
-    {
-        ResultadoMinigame resultado = AtualizarTravessia(sessao, GetFrameTime());
-        if (resultado != MINIGAME_EM_CURSO && IsKeyPressed(KEY_R))
-        {
-            EncerrarTravessia(sessao);
-            sessao = IniciarTravessia(true, 0);
-            continue;
-        }
-
-        BeginDrawing();
-        DesenharTravessia(sessao);
-        if (resultado != MINIGAME_EM_CURSO)
-        {
-            DrawRectangle(0, 0, LARGURA, ALTURA, Fade(BLACK, 0.6f));
-            const SessaoTravessia *s = sessao;
-            textoCentralizado("FIM DE JOGO", 200, 44, corJogador);
-            textoCentralizado(TextFormat("Você avançou %d pistas", s->maiorLinha), 258, 24, RAYWHITE);
-            textoCentralizado("R para jogar de novo  |  ESC para sair", 310, 20, RAYWHITE);
-        }
-        EndDrawing();
-    }
-    if (sessao)
-        EncerrarTravessia(sessao);
-    CloseWindow();
-    return 0;
-}
-#endif

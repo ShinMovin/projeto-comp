@@ -45,7 +45,7 @@ make run
 ### Recursos e banco de perguntas
 
 - O jogo carrega `dados/perguntas.dat` e usa `dados/perguntas.csv` como alternativa. O DAT guarda um `int` com a quantidade seguido do vetor de `Pergunta`. O CSV utiliza UTF-8 e aceita quebras LF ou CRLF.
-- Os alvos opcionais `guitarhero`, `tiroalvo` e `travessia` compilam os minigames independentes. O Makefile copia os áudios para `compilado/guitarhero-musicas/` e `compilado/audio-tiroalvo/`. No Linux, execute `make guitarhero tiroalvo travessia` a partir da raiz.
+- Ao compilar, o Makefile copia os áudios dos minigames para `compilado/guitarhero-musicas/` e `compilado/audio-tiroalvo/`.
 
 ## Partida
 
@@ -59,7 +59,7 @@ Use **PEDIR AJUDA** na pergunta ou **TESTAR MINIGAMES** no menu da janela. Ambos
 - **Tiro ao Alvo** exige 7.500 pontos em 30 segundos. A vitória elimina duas alternativas incorretas sorteadas.
 - **Travessia** usa as setas ou WASD. Avance 25 pistas com três vidas para ganhar uma segunda chance na pergunta atual. O treino continua até acabarem as vidas.
 
-Cada tentativa de ajuda é consumida ao iniciar o desafio, inclusive se ele for abandonado. O Makefile copia as faixas e efeitos dos minigames ao compilar o jogo principal. Os alvos independentes continuam disponíveis para treino isolado.
+Cada tentativa de ajuda é consumida ao iniciar o desafio, inclusive se ele for abandonado. Para treinar um minigame sozinho, use **TESTAR MINIGAMES** no menu da janela.
 
 ## Padrão para cadastrar perguntas
 

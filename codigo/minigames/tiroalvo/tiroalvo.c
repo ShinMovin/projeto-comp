@@ -6,11 +6,8 @@
 #define LARGURA 800
 #define ALTURA 600
 
-#define TELA_MENU 0
-#define TELA_CONTAGEM 1
-#define TELA_JOGO 2
-#define TELA_FIM 3
-#define TELA_MUSICA 4
+#define TELA_CONTAGEM 0
+#define TELA_JOGO 1
 
 #define DURACAO_PARTIDA 30
 #define DURACAO_CONTAGEM 3
@@ -56,23 +53,6 @@ const Color corAmbarTiro = {255, 177, 80, 255};
 const Rectangle janelasTiro[] = {{86, 190, 130, 88}, {584, 190, 130, 88}};
 
 // Desenha o botão e retorna true quando ele é clicado.
-#ifdef TIROALVO_INDEPENDENTE
-bool botaoTiro(Rectangle area, const char *texto, bool selecionado)
-{
-    bool sobreBotao = CheckCollisionPointRec(GetMousePosition(), area);
-    Color cor = {32, 50, 66, 255};
-
-    if (selecionado)
-        cor = (Color){27, 76, 84, 255};
-    else if (sobreBotao)
-        cor = (Color){47, 74, 94, 255};
-
-    DrawRectangleRec(area, cor);
-    DrawRectangleLinesEx(area, 2, selecionado || sobreBotao ? corAcentoTiro : (Color){61, 86, 105, 255});
-    textoNoRetangulo(texto, area, 24, WHITE);
-    return sobreBotao && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-}
-#endif
 
 void desenharCabineTiro(void)
 {
@@ -376,89 +356,3 @@ void EncerrarTiro(SessaoTiro *sessao)
     }
     free(sessao);
 }
-
-#ifdef TIROALVO_INDEPENDENTE
-int main(void)
-{
-    InitWindow(LARGURA, ALTURA, "Tiro ao Alvo");
-    SetTargetFPS(60);
-    InitAudioDevice();
-
-    int tela = TELA_MENU;
-    int faixaEscolhida = 0;
-    SessaoTiro *sessao = NULL;
-    while (!WindowShouldClose())
-    {
-        if (tela == TELA_JOGO && AtualizarTiro(sessao, GetFrameTime()) != MINIGAME_EM_CURSO)
-        {
-            if (IsMusicValid(sessao->trilha))
-                StopMusicStream(sessao->trilha);
-            tela = TELA_FIM;
-        }
-
-        BeginDrawing();
-        ClearBackground(BLACK);
-        bool sair = false;
-        if (tela == TELA_JOGO)
-            DesenharTiro(sessao);
-        else
-        {
-            desenharCabineTiro();
-            const Rectangle painel = {174, 91, 452, 418};
-            DrawRectangle(0, 0, LARGURA, ALTURA, Fade(BLACK, 0.45f));
-            DrawRectangleRec(painel, corPainelTiro);
-            DrawRectangleLinesEx(painel, 2, (Color){61, 86, 105, 255});
-            DrawRectangle(368, 91, 64, 3, corAmbarTiro);
-            if (tela == TELA_MENU)
-            {
-                textoCentralizado("Tiro ao Alvo", 129, 48, WHITE);
-                textoCentralizado(TextFormat("Faça %d pontos em %d segundos", META_PONTOS, DURACAO_PARTIDA), 189, 23, RAYWHITE);
-                textoCentralizado(TextFormat("Alvo falso: -%d pontos", PONTOS_LENDARIO), 221, 20, corAmbarTiro);
-                textoCentralizado(TextFormat("Faixa: %s", faixasTiro[faixaEscolhida].nome), 461, 18, corAcentoTiro);
-                if (botaoTiro((Rectangle){290, 262, 220, 50}, "Jogar", false))
-                {
-                    sessao = IniciarTiro(true, faixaEscolhida);
-                    if (sessao)
-                        tela = TELA_JOGO;
-                }
-                if (botaoTiro((Rectangle){290, 324, 220, 50}, "Música", false))
-                    tela = TELA_MUSICA;
-                sair = botaoTiro((Rectangle){290, 386, 220, 50}, "Sair", false);
-            }
-            else if (tela == TELA_MUSICA)
-            {
-                textoCentralizado("Música", 132, 46, WHITE);
-                for (int i = 0; NomeOpcaoTiro(true, i); i++)
-                {
-                    if (botaoTiro((Rectangle){230, 210 + 55 * i, 340, 44}, faixasTiro[i].nome, i == faixaEscolhida))
-                        faixaEscolhida = i;
-                }
-                if (botaoTiro((Rectangle){290, 408, 220, 50}, "Voltar", false))
-                    tela = TELA_MENU;
-            }
-            else if (tela == TELA_FIM)
-            {
-                bool venceu = sessao->resultado == MINIGAME_VITORIA;
-                textoCentralizado(venceu ? "Vitória!" : "Tempo esgotado", 165, 48, venceu ? GREEN : RED);
-                textoCentralizado(TextFormat("Pontuação final: %d / %d", sessao->pontos, META_PONTOS), 245, 24, WHITE);
-                if (botaoTiro((Rectangle){290, 330, 220, 52}, "Voltar ao menu", false))
-                {
-                    EncerrarTiro(sessao);
-                    sessao = NULL;
-                    tela = TELA_MENU;
-                }
-            }
-        }
-        EndDrawing();
-        if (sair)
-            break;
-    }
-
-    if (sessao)
-        EncerrarTiro(sessao);
-    if (IsAudioDeviceReady())
-        CloseAudioDevice();
-    CloseWindow();
-    return 0;
-}
-#endif
