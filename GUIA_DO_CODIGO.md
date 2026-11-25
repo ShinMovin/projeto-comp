@@ -66,7 +66,7 @@ Na raiz, `dados/` guarda o CSV inicial e o DAT ativo. `compilado/` recebe os exe
 
 `&jogo` é o endereço da variável `jogo`. Uma função que recebe `Jogo *` pode alterar essa variável. Com `const Jogo *`, ela pode consultar os dados para desenhar a tela. Usa-se `->` para acessar o campo de uma struct por meio do ponteiro.
 
-Os vetores do banco começam com espaço para cinco perguntas. Ao esgotar a capacidade, `redimensionarBanco()` aloca dois vetores maiores. Um laço `for` copia a pergunta e a marca de uso de cada posição. Só depois os vetores antigos são liberados. Se uma alocação falhar, eles continuam utilizáveis. Ao excluir, outro laço desloca a pergunta e sua marca de uso juntas.
+Os vetores do banco começam com espaço para cinco perguntas. Ao esgotar a capacidade, `adicionaPerguntas()` dobra os dois vetores (`perguntas` e `usadas`) com `realloc`. O resultado vai primeiro para um ponteiro temporário: se o `realloc` falhar, o vetor antigo continua utilizável. Ao excluir, `excluirPerguntaPorIndice()` puxa a pergunta e sua marca de uso uma posição para trás e, quando sobram três quartos livres, diminui os vetores pela metade.
 
 As sessões de minigames são alocadas ao entrar e liberadas ao sair. Cada jogo conhece a própria struct. A interface guarda seu endereço em um `void *` junto do enum do tipo. Antes de acessar os dados, o `switch` entrega o endereço à função do tipo certo, como `AtualizarTiro()`.
 
