@@ -175,61 +175,6 @@ int adicionaPerguntas(BancoPerguntas *banco, const Pergunta *perguntas)
     return 1;
 }
 
-//troca a pergunta da posicao indice (0 e a primeira)
-bool editarPerguntaPorIndice(BancoPerguntas *banco, int indice, const Pergunta *pergunta)
-{
-    if (indice < 0 || indice >= banco->quantidade || validarPergunta(pergunta) != NULL)
-        return false;
-    banco->perguntas[indice] = *pergunta;
-    banco->usadas[indice] = false;
-    return true;
-}
-
-//remove a pergunta da posicao indice (0 e a primeira), diminuindo o vetor se sobrar espaco
-bool excluirPerguntaPorIndice(BancoPerguntas *banco, int indice)
-{
-    if(indice < 0 || indice >= banco->quantidade)
-    {
-        return false;
-    }
-
-    //puxa todas as perguntas seguintes uma posicao para tras
-    for(int i = indice ; i < banco->quantidade - 1 ; i++)
-    {
-        banco->perguntas[i] = banco->perguntas[i + 1];
-        banco->usadas[i] = banco->usadas[i + 1];
-    }
-
-    banco->quantidade--;
-
-    //realocar memoria
-    if(banco->quantidade <= banco->capacidade / 4 && banco->capacidade > CAPACIDADE_INICIAL)
-    {
-        int novaCapacidade = banco->capacidade / 2;
-
-        Pergunta *temp = realloc(banco->perguntas, novaCapacidade * sizeof(Pergunta));
-
-        bool *tempUsadas = realloc(banco->usadas, novaCapacidade * sizeof(bool));
-
-        if(temp != NULL)
-        {
-            banco->perguntas = temp;
-        }
-
-        if(tempUsadas != NULL)
-        {
-            banco->usadas = tempUsadas;
-        }
-
-        if(temp != NULL && tempUsadas != NULL)
-        {
-            banco->capacidade = novaCapacidade;
-        }
-    }
-
-    return true;
-}
-
 //diz se a pergunta do indice combina com o pedido e ainda nao saiu na partida
 static bool perguntaDisponivel(const BancoPerguntas *banco, int indice,
                                Dificuldade dificuldade, Categoria categoria)
@@ -729,7 +674,6 @@ int pesquisaPergunta(BancoPerguntas *banco)
 //pergunta pelo terminal qual pergunta remover
 int excluiPergunta(BancoPerguntas *banco)
 {
-
     int indice_removido = 0;
 
     if(banco->quantidade == 0)
@@ -752,8 +696,38 @@ int excluiPergunta(BancoPerguntas *banco)
         return 0;
     }
 
-    //o usuario conta a partir de 1 e o vetor a partir de 0
-    return excluirPerguntaPorIndice(banco, indice_removido - 1);
+    //puxa todas as perguntas seguintes uma posicao para tras
+    for(int i = (indice_removido - 1) ; i < banco->quantidade - 1 ; i++)
+    {
+        banco->perguntas[i] = banco->perguntas[i + 1];
+        banco->usadas[i] = banco->usadas[i + 1];
+    }
+
+    banco->quantidade--;
+
+    //realocar memoria
+    if(banco->quantidade <= banco->capacidade / 4 && banco->capacidade > CAPACIDADE_INICIAL)
+    {
+        int novaCapacidade = banco->capacidade / 2;
+
+        Pergunta *temp = realloc(banco->perguntas, novaCapacidade * sizeof(Pergunta));
+        bool *tempUsadas = realloc(banco->usadas, novaCapacidade * sizeof(bool));
+
+        if(temp != NULL)
+        {
+            banco->perguntas = temp;
+        }
+        if(tempUsadas != NULL)
+        {
+            banco->usadas = tempUsadas;
+        }
+        if(temp != NULL && tempUsadas != NULL)
+        {
+            banco->capacidade = novaCapacidade;
+        }
+    }
+
+    return 1;
 }
 
 //pergunta pelo terminal qual pergunta alterar e le os novos dados
@@ -788,11 +762,16 @@ int alteraPergunta(BancoPerguntas *banco)
         return 0;
     }
 
-    if(editarPerguntaPorIndice(banco, indice - 1, &nova) == false)
+    const char *erro = validarPergunta(&nova);
+    if(erro != NULL)
     {
-        printf("%s\n", validarPergunta(&nova));
+        printf("%s\n", erro);
         return 0;
     }
+
+    //o usuario conta a partir de 1 e o vetor a partir de 0
+    banco->perguntas[indice - 1] = nova;
+    banco->usadas[indice - 1] = false;
 
     return 1;
 }
